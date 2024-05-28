@@ -145,9 +145,9 @@ export class AttendanceService {
             sort,
           });
 
-          // if (!tree) {
-          //   return;
-          // }
+          if (!tree) {
+            APIResponse.error(response,apiId,"Invalid Sort Key","BAD_REQUEST",HttpStatus.BAD_REQUEST);
+          }
           result[field] = tree[field];
         }
 
@@ -258,9 +258,7 @@ export class AttendanceService {
       // Validate sort keys
       if (sort) {
         const [sortField, sortOrder] = sort;
-        console.log(sortField,sortOrder);
         const validSortKey = `${sortField.replace('_percentage', '')}_percentage`;
-        console.log(attendanceKeys);
         if (!attendanceKeys.has(sortField.replace("_percentage", "")) && sortField !== 'present_percentage' && sortField !== 'absent_percentage') {
           return false;
         }
@@ -539,7 +537,7 @@ export class AttendanceService {
     try {
       const attendanceFound = await this.updateAttendance(attendanceDto,loginUserId);
       if (attendanceFound) {
-       APIResponse.success(res,apiId,attendanceFound,HttpStatus.CREATED,"Attendance updated successfully");
+       APIResponse.success(res,apiId,attendanceFound,HttpStatus.OK,"Attendance updated successfully");
       } else {
         if (!attendanceDto.scope) {
           attendanceDto.scope = 'student';
@@ -547,7 +545,7 @@ export class AttendanceService {
         attendanceDto.createdBy = loginUserId;
         attendanceDto.updatedBy = loginUserId;
         let attendanceCreated = await this.createAttendance(attendanceDto);
-        APIResponse.success(res,apiId,attendanceCreated,HttpStatus.OK,"Attendance created successfully");
+        APIResponse.success(res,apiId,attendanceCreated,HttpStatus.CREATED,"Attendance created successfully");
       }
     } catch (e) {
       APIResponse.error(res, apiId, "Internal Server Error", `Error is ${e}`,HttpStatus.INTERNAL_SERVER_ERROR);
@@ -695,6 +693,9 @@ export class AttendanceService {
           }
         }
         if (errors.length > 0) {
+          if(!results.length){
+            APIResponse.error(res, apiId, "BAD_REQUEST", `Attendance Can not be created or updated.Error is ${errors[0].error}`, HttpStatus.BAD_REQUEST);
+          }
           APIResponse.success(res, apiId, { count: count, errors: errors, successresults: results }, HttpStatus.CREATED, "Bulk Attendance Processed with some errors");
         } else {
           APIResponse.success(res, apiId, { count: count, results: results }, HttpStatus.CREATED, "Bulk Attendance Updated successfully");

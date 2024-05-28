@@ -1,26 +1,20 @@
-import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { AppController } from "./app.controller";
-import { AppService } from "./app.service";
-// import { MulterModule } from "@nestjs/platform-express/multer";
-// Below modules not in use for Shiksha 2.0
-
-/*
-import { ConfigurationModule } from "./configs/configuration.module";
-*/
-// In use for Shiksha 2.0
-import { DatabaseModule } from "./common/database.module";
-import { RbacModule } from "./rbac/rbac.module";
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { DatabaseModule } from './common/database/database.module';
+import { CacheModule } from '@nestjs/cache-manager';
+import { MemoryStore } from 'cache-manager-memory-store';
+import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { AttendanceModule } from './modules/attendance/attendance.module';
+// import { AssessmentTracking } from "src/modules/tracking_assesment/entities/tracking-assessment-entity";
 
 @Module({
   imports: [
-    RbacModule,
+    AttendanceModule,
     ConfigModule.forRoot({ isGlobal: true }),
-    // MulterModule.register({
-    //   dest: "./uploads",
-    // }),
-
     DatabaseModule,
+    CacheModule.register({ isGlobal: true, store: MemoryStore })
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -14,8 +14,6 @@ import { Response} from 'express';
 
 
 // import { CohortMembers } from 'src/cohortMembers/entities/cohort-member.entity';
-
-const moment = require('moment');
 // const facetedSearch = require('in-memory-faceted-search');
 
 @Injectable()
@@ -77,7 +75,7 @@ export class AttendanceService {
             whereClause['attendanceDate'] = Between(fromDate, toDate);
           } else {
             // If filter key is invalid, return a BadRequest response
-            APIResponse.error(response, apiId, "BAD_REQUEST", `Please Enter Valid Key to Search. Invalid Key entered Is ${key}`,HttpStatus.BAD_REQUEST);
+            return APIResponse.error(response, apiId, "BAD_REQUEST", `Please Enter Valid Key to Search. Invalid Key entered Is ${key}`,HttpStatus.BAD_REQUEST);
           }
         }
       }
@@ -92,7 +90,7 @@ export class AttendanceService {
             orderOption[column] = order.toUpperCase();
           } else {
             // If sort key is invalid, return a BadRequest response
-            APIResponse.error(response, apiId, "BAD_REQUEST", `${column} Invalid sort key`,HttpStatus.BAD_REQUEST);
+            return APIResponse.error(response, apiId, "BAD_REQUEST", `${column} Invalid sort key`,HttpStatus.BAD_REQUEST);
           }
         }
 
@@ -111,7 +109,7 @@ export class AttendanceService {
         //     attendanceList: paginatedAttendanceList,
         //   },
         // });
-        APIResponse.success(response,apiId,{attendanceList: paginatedAttendanceList},HttpStatus.OK,"Ateendance List Fetched Successfully");
+        return APIResponse.success(response,apiId,{attendanceList: paginatedAttendanceList},HttpStatus.OK,"Ateendance List Fetched Successfully");
       }
 
       if (facets && facets.length > 0) {
@@ -128,7 +126,7 @@ export class AttendanceService {
             //   statusCode: HttpStatus.BAD_REQUEST,
             //   errorMessage: `${facet} Invalid facet`,
             // });
-            APIResponse.error(response, apiId, "BAD_REQUEST", `${facet} Invalid facet`,HttpStatus.BAD_REQUEST);
+            return APIResponse.error(response, apiId, "BAD_REQUEST", `${facet} Invalid facet`,HttpStatus.BAD_REQUEST);
             
           }
 
@@ -146,7 +144,7 @@ export class AttendanceService {
           });
 
           if (!tree) {
-            APIResponse.error(response,apiId,"Invalid Sort Key","BAD_REQUEST",HttpStatus.BAD_REQUEST);
+            return APIResponse.error(response,apiId,"Invalid Sort Key","BAD_REQUEST",HttpStatus.BAD_REQUEST);
           }
           result[field] = tree[field];
         }
@@ -159,23 +157,11 @@ export class AttendanceService {
         //     result: result,
         //   },
         // });
-        APIResponse.success(response,apiId,result,HttpStatus.OK,"Ateendance List Fetched Successfully");
+        return APIResponse.success(response,apiId,result,HttpStatus.OK,"Ateendance List Fetched Successfully");
       }
     } catch (error) {
-      if (error.code === '22P02') {
-        // Handle invalid input value error
-        // return new ErrorResponseTypeOrm({
-        //   statusCode: HttpStatus.BAD_REQUEST,
-        //   errorMessage: `Invalid value entered for ${error.routine}`,
-        // });
-        APIResponse.error(response,apiId,"Invalid input value error",`Invalid value entered for ${error.routine}`,HttpStatus.BAD_REQUEST)
-      }
-      // Handle other errors with internal server error response
-      APIResponse.error(response,apiId,"INTERNAL_SERVER_ERROR",error,HttpStatus.BAD_REQUEST)
-      // return new ErrorResponseTypeOrm({
-      //   statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-      //   errorMessage: error, // Use error message if available
-      // });
+      const errorMessage = error.message || "Internal Server Error";
+      return APIResponse.error(response,apiId,"INTERNAL_SERVER_ERROR",errorMessage,HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
@@ -537,7 +523,7 @@ export class AttendanceService {
     try {
       const attendanceFound = await this.updateAttendance(attendanceDto,loginUserId);
       if (attendanceFound) {
-       APIResponse.success(res,apiId,attendanceFound,HttpStatus.OK,"Attendance updated successfully");
+       return APIResponse.success(res,apiId,attendanceFound,HttpStatus.OK,"Attendance updated successfully");
       } else {
         if (!attendanceDto.scope) {
           attendanceDto.scope = 'student';
@@ -545,10 +531,11 @@ export class AttendanceService {
         attendanceDto.createdBy = loginUserId;
         attendanceDto.updatedBy = loginUserId;
         let attendanceCreated = await this.createAttendance(attendanceDto);
-        APIResponse.success(res,apiId,attendanceCreated,HttpStatus.CREATED,"Attendance created successfully");
+        return APIResponse.success(res,apiId,attendanceCreated,HttpStatus.CREATED,"Attendance created successfully");
       }
     } catch (e) {
-      APIResponse.error(res, apiId, "Internal Server Error", `Error is ${e}`,HttpStatus.INTERNAL_SERVER_ERROR);
+      const errorMessage = e.message || "Internal Server Error";
+      return APIResponse.error(res, apiId, "Internal Server Error", errorMessage,HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -694,16 +681,15 @@ export class AttendanceService {
         }
         if (errors.length > 0) {
           if(!results.length){
-            APIResponse.error(res, apiId, "BAD_REQUEST", `Attendance Can not be created or updated.Error is ${errors[0].error}`, HttpStatus.BAD_REQUEST);
+            return APIResponse.error(res, apiId, "BAD_REQUEST", `Attendance Can not be created or updated.Error is ${errors[0].error}`, HttpStatus.BAD_REQUEST);
           }
-          APIResponse.success(res, apiId, { count: count, errors: errors, successresults: results }, HttpStatus.CREATED, "Bulk Attendance Processed with some errors");
+          return APIResponse.success(res, apiId, { count: count, errors: errors, successresults: results }, HttpStatus.CREATED, "Bulk Attendance Processed with some errors");
         } else {
-          APIResponse.success(res, apiId, { count: count, results: results }, HttpStatus.CREATED, "Bulk Attendance Updated successfully");
+          return APIResponse.success(res, apiId, { count: count, results: results }, HttpStatus.CREATED, "Bulk Attendance Updated successfully");
         }
       } catch (e) {
-        APIResponse.error(res, apiId, "Internal Server Error", `Error is ${e}`, HttpStatus.INTERNAL_SERVER_ERROR);
+        const errorMessage = e.message || "Internal Server Error";
+        return APIResponse.error(res, apiId, "Internal Server Error", errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
       }
     }
-    
-
 }

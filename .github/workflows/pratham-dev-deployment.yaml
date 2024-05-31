@@ -1,0 +1,26 @@
+name: Event-Management-Service Deployment on Pratham-dev in OU
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Deploy to Remote Server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.HOST_NAME_DEV }}
+        username: ${{ secrets.USERNAME_DEV }}
+        key: ${{ secrets.SSH_KEY_DEV }}
+        port: ${{ secrets.PORT_DEV }}
+        script: |
+          cd ${{ secrets.TARGET_DIR_DEV }}
+          ./deploy.sh

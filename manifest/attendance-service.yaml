@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert -f attendance.yaml
+    kompose.version: 1.21.0 (992df58d8)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: attendancegmanagement
+  name: attendancegmanagement
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: attendancegmanagement
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert -f attendance.yaml
+        kompose.version: 1.21.0 (992df58d8)
+      creationTimestamp: null
+      labels:
+        io.kompose.service: attendancegmanagement
+    spec:
+      containers:
+      - image:  ${ECR_REPOSITORY}:${IMAGE_TAG}
+        imagePullPolicy: ""
+        name: attendance-service
+        ports:
+        - containerPort: 3000
+        resources: {}
+      restartPolicy: Always
+      serviceAccountName: ""
+      volumes: null
+status: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert -f attendance.yaml
+    kompose.version: 1.21.0 (992df58d8)
+  labels:
+    io.kompose.service: attendancemanagement
+  name: attendancemanagement
+spec:
+  type: NodePort
+  ports:
+  - port: 31270
+    targetPort: 3000
+    nodePort: 31270
+  selector:
+    io.kompose.service: attendancemanagement

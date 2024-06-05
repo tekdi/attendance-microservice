@@ -88,4 +88,4 @@ jobs:
         kubectl get pods
         kubectl get services
         kubectl get deployment 
-        kubectl apply -f manifest/
+        

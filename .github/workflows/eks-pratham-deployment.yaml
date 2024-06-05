@@ -80,11 +80,8 @@ jobs:
         export ECR_IMAGE=${{ secrets.ECR_IMAGE }}
         envsubst < manifest/attendance-service.yaml > manifest/attendance-service-updated.yaml
         cat manifest/attendance-service-updated.yaml
-        kubectl get pods
-        kubectl get services
-        kubectl get deployment 
         rm -rf manifest/attendance-service.yaml
-        kubectl delete deployment attendancemanagement
+        kubectl delete deployment attendancegmanagement
         kubectl delete service attendancemanagement
         kubectl apply -f manifest/attendance-service-updated.yaml
         sleep 10

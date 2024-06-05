@@ -39,17 +39,14 @@ status: {}
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert -f attendance.yaml
-    kompose.version: 1.21.0 (992df58d8)
-  labels:
-    io.kompose.service: attendancemanagement
   name: attendancemanagement
+  labels:
+    app: attendancemanagement
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
-  - port: 31270
-    targetPort: 3000
-    nodePort: 31270
+  - name: http-attendance
+    protocol: TCP
+    port: 3000
   selector:
-    io.kompose.service: attendancemanagement
+    app: attendancemanagement

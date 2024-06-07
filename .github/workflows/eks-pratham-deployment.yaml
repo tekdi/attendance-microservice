@@ -1,5 +1,5 @@
 
-name: Deploy to EKS-Pratham
+name: Deploy to EKS-Pratham-ms
 on:
   push:
     branches:
@@ -31,7 +31,7 @@ jobs:
     - name: Copy .env file
       env:
        ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_CONTENT }}
-      run: echo "$ENV_FILE_CONTENT" > manifest/congigmap.yaml
+      run: echo "$ENV_FILE_CONTENT" > manifest/configmap.yaml
     - name: Show PWD and list content
       run: |
            echo "Current Working Directory: pwd"

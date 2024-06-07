@@ -27,6 +27,9 @@ spec:
       - image:  ${ECR_REPOSITORY}:${IMAGE_TAG}
         imagePullPolicy: ""
         name: attendance-service
+        envFrom:
+        - configMapRef:
+            name: attendance-service-confi
         ports:
         - containerPort: 3000
         resources: {}

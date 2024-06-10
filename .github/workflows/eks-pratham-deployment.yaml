@@ -45,7 +45,7 @@ jobs:
       run: |
           echo "Current Working Directory: pwd"
           pwd
-          ls -ltra
+          ls -ltra manifest/
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -78,7 +78,7 @@ jobs:
         cat manifest/attendance-service-updated.yaml
         rm -rf manifest/attendance-service.yaml
        
-       
+        ls -ltra manifest/
         kubectl delete cm attendance-service-config
         kubectl apply -f manifest/configmap.yaml
         kubectl apply -f manifest/attendance-service-updated.yaml

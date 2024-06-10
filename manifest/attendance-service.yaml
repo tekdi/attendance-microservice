@@ -3,19 +3,19 @@ kind: Deployment
 metadata:
   creationTimestamp: null
   labels:
-    app: attendancegmanagement
-  name: attendancegmanagement
+    app: attendancemanagement
+  name: attendancemanagement
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: attendancegmanagement
+      app: attendancemanagement
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: attendancegmanagement
+        app: attendancemanagement
     spec:
       containers:
       - image:  ${ECR_REPOSITORY}:${IMAGE_TAG}

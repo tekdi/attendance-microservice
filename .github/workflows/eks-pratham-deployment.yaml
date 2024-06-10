@@ -79,7 +79,9 @@ jobs:
         rm -rf manifest/attendance-service.yaml
         
         ls -ltra manifest/
-        
+        kubectl delete service attendancemanagement
+        kubectl delete deployment attendancemanagement
+        kubectl delete cm attendance-service-config
         kubectl apply -f manifest/configmap.yaml
         kubectl apply -f manifest/attendance-service-updated.yaml
         sleep 10

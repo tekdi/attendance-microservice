@@ -39,7 +39,7 @@ jobs:
         pwd
         ls -ltra
     - name: Creating Dockerfile
-      run: echo "${{ secrets.DOCKERFILE_FILE_CONTENT }}" > Dockerfile
+      run: echo "${{ secrets.DOCKERFILE_PROD }}" > Dockerfile
     - name: Show PWD and list content
       run: |
         echo "Current Working Directory: $(pwd)"

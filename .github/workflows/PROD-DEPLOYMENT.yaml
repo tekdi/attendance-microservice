@@ -71,12 +71,11 @@ jobs:
         export ECR_REPOSITORY=${{ secrets.ECR_REPOSITORY_PROD }}
         export IMAGE_TAG=${{ secrets.IMAGE_TAG_PROD }}
         export ECR_IMAGE=${{ secrets.ECR_IMAGE_PROD }}
-        envsubst < manifest/tracking-service.yaml > manifest/attendance-service-updated.yaml
+        envsubst < manifest/attendance-service.yaml > manifest/attendance-service-updated.yaml
         echo "Contents of manifest/attendance-service-updated.yaml:"
         cat manifest/attendance-service-updated.yaml
         ls -ltra manifest/
         kubectl apply -f manifest/configmap.yaml
-        #kubectl delete deploy trackingmanagement
         kubectl apply -f manifest/attendance-service-updated.yaml
         echo "kubectl apply exit code: $?"
         kubectl get configmap

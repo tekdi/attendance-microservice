@@ -1,0 +1,82 @@
+name: PROD-PRATHAM-MICROSERVICES-ATTENDANCE-DEPLOYMENT on EKS
+on:
+  push:
+    branches:
+      - june15-pilot
+
+env:
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_PROD }}
+  EKS_CLUSTER_NAME_PROD: ${{ secrets.EKS_CLUSTER_NAME_PROD }}
+  AWS_REGION: ${{ secrets.AWS_REGION_NAME_PROD }}
+jobs:
+  build:
+    name: Deployment
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set short git commit SHA
+      id: commit
+      uses: prompt/actions-commit-hash@v2
+    - name: Check out code
+      uses: actions/checkout@v2
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    - name: Setup Node Env
+      uses: actions/setup-node@v3
+      with:
+        node-version: 21.1.0
+    - name: Decode and write .env file
+      run: |
+        echo "${{ secrets.ENV_FILE_PROD }}" | base64 -d > manifest/configmap.yaml
+        echo "Contents of manifest/configmap.yaml:"
+        cat manifest/configmap.yaml
+    - name: Show PWD and list content
+      run: |
+        echo "Current Working Directory: $(pwd)"
+        pwd
+        ls -ltra
+    - name: Creating Dockerfile
+      run: echo "${{ secrets.DOCKERFILE_FILE_CONTENT }}" > Dockerfile
+    - name: Show PWD and list content
+      run: |
+        echo "Current Working Directory: $(pwd)"
+        pwd
+        ls -ltra
+        ls -ltra manifest/
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+    - name: Build, tag, and push image to Amazon ECR
+      run: |
+        docker build -t ${{ secrets.ECR_REPOSITORY_PROD }}:${{ secrets.IMAGE_TAG_PROD }} .
+        docker push ${{ secrets.ECR_REPOSITORY_PROD }}:${{ secrets.IMAGE_TAG_PROD }}
+    - name: Update kube config
+      run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME_PROD }} --region ${{ secrets.AWS_REGION_NAME }}
+    - name: Deploy to EKS
+      env:
+        ECR_REGISTRY: ${{ secrets.ECR_REPOSITORY_PROD }}
+        IMAGE_TAG: ${{ secrets.IMAGE_TAG_PROD }}
+        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_PROD }}
+        ECR_IMAGE: ${{ secrets.ECR_IMAGE_PROD }}
+      run: |
+        export ECR_REPOSITORY=${{ secrets.ECR_REPOSITORY_PROD }}
+        export IMAGE_TAG=${{ secrets.IMAGE_TAG_PROD }}
+        export ECR_IMAGE=${{ secrets.ECR_IMAGE_PROD }}
+        envsubst < manifest/tracking-service.yaml > manifest/attendance-service-updated.yaml
+        echo "Contents of manifest/attendance-service-updated.yaml:"
+        cat manifest/attendance-service-updated.yaml
+        ls -ltra manifest/
+        kubectl apply -f manifest/configmap.yaml
+        #kubectl delete deploy trackingmanagement
+        kubectl apply -f manifest/attendance-service-updated.yaml
+        echo "kubectl apply exit code: $?"
+        kubectl get configmap

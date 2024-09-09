@@ -662,8 +662,8 @@ export class AttendanceService {
             syncTime: attendance?.syncTime,
             session: attendance?.session,
             contextType: attendance?.contextType,
-            // createdBy:loginUserId,
-            // updatedBy:loginUserId
+            createdBy:loginUserId,
+            updatedBy:loginUserId
           });
     
           try {

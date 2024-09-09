@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsDate, IsNotEmpty, Matches, Validate, ValidateIf, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from "class-validator";
-import { isAfter, isBefore, isSameDay } from "date-fns";
+import { IsNotEmpty, Matches, Validate, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from "class-validator";
+import { isBefore, isSameDay } from "date-fns";
 
 
 @ValidatorConstraint({ name: 'isNotAfterFromDate', async: false })

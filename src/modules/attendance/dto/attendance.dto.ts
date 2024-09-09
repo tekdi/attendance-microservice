@@ -1,9 +1,9 @@
 import { CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { IsDate, IsDateString, IsDefined, IsEnum, IsUUID, Matches, Validate, ValidateIf, ValidateNested, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
-import { Exclude, Expose, Transform, Type } from "class-transformer";
+import { IsDefined, IsEnum, IsUUID, Matches, Validate, ValidateIf, ValidateNested, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
+import { Expose, Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsNotEmpty, IsString, IsObject } from 'class-validator';
-import { addHours, format, isAfter, isBefore, isValid } from 'date-fns'; // Import isAfter function from date-fns
+import { IsNotEmpty } from 'class-validator';
+import { addHours, isBefore } from 'date-fns'; // Import isAfter function from date-fns
 
 //for student valid enum are[present,absent]
 //for teacher valid enum are[present,on-leave,half-day]
@@ -125,7 +125,6 @@ export class AttendanceDto {
   // @JoinColumn({ name: "contextId", referencedColumnName: "cohortId" }) // Map contextId to cohortId column in Cohort table
   // cohort: Cohort;
 
-
   @CreateDateColumn()
   @Expose()
   createdAt: string;
@@ -166,7 +165,6 @@ export class UserAttendanceDTO {
   @IsNotEmpty()
   @IsEnum(Attendance, { message: "Please enter valid enum values for attendance [present, absent,on-leave, half-day]" })
   attendance: string;
-
 
   @Expose()
   @ApiPropertyOptional()

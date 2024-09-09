@@ -38,13 +38,12 @@ export class AttendanceController {
   private readonly attendanceService: AttendanceService,
   ) {}
 
-  @Post()
+  @Post("create")
   @ApiBasicAuth("access-token")
   @ApiCreatedResponse({
     description: "Attendance has been created successfully.",
   })
   @ApiBody({ type: AttendanceDto })
-  // @UseInterceptors(ClassSerializerInterceptor)
   @ApiHeader({
     name: "tenantid"
   })
@@ -58,17 +57,23 @@ export class AttendanceController {
   ) {
     let userId = request?.user?.userId
     attendanceDto.tenantId = headers["tenantid"];
+    if (!headers["tenantid"]) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        statusCode: HttpStatus.BAD_REQUEST,
+        errorMessage: "tenantId is missing in headers",
+      });
+    }
+    
     attendanceDto.image = image?.filename;
     const result = await this.attendanceService.updateAttendanceRecord(
       userId,
       attendanceDto,
       response
     );
-    // return response.status(result.statusCode).json(result);
     return result;
   }
   
-  @Post("/list")
+  @Post("list")
   @ApiBasicAuth("access-token")
   @ApiOkResponse({ description: "Attendance List" })
   @ApiBadRequestResponse({ description: "Bad Request" })
@@ -123,6 +128,12 @@ export class AttendanceController {
     @Body() attendanceDtos: BulkAttendanceDTO
   ) {
     let tenantId = headers["tenantid"];
+    if (!tenantId) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        statusCode: HttpStatus.BAD_REQUEST,
+        errorMessage: "tenantId is missing in headers",
+      });
+    }
     const result = await this.attendanceService.multipleAttendance(
       tenantId,
       request,

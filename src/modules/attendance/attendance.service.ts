@@ -1,17 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AttendanceEntity } from './entities/attendance.entity';
-import {
-  Repository,
-  Between,
-  In,
-} from 'typeorm';
+import { Repository, Between, In } from 'typeorm';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AttendanceSearchDto } from './dto/attendance-search.dto';
 import { AttendanceDto, BulkAttendanceDTO } from './dto/attendance.dto';
 import APIResponse from 'src/common/utils/response';
-import { Response} from 'express';
-
+import { Response } from 'express';
 
 // import { CohortMembers } from 'src/cohortMembers/entities/cohort-member.entity';
 // const facetedSearch = require('in-memory-faceted-search');
@@ -33,7 +28,7 @@ export class AttendanceService {
   async searchAttendance(
     tenantId: string,
     attendanceSearchDto: AttendanceSearchDto,
-    response: Response
+    response: Response,
   ) {
     let apiId = 'api.post.seacrhAttendance';
     try {
@@ -75,7 +70,13 @@ export class AttendanceService {
             whereClause['attendanceDate'] = Between(fromDate, toDate);
           } else {
             // If filter key is invalid, return a BadRequest response
-            return APIResponse.error(response, apiId, "BAD_REQUEST", `Please Enter Valid Key to Search. Invalid Key entered Is ${key}`,HttpStatus.BAD_REQUEST);
+            return APIResponse.error(
+              response,
+              apiId,
+              'BAD_REQUEST',
+              `Please Enter Valid Key to Search. Invalid Key entered Is ${key}`,
+              HttpStatus.BAD_REQUEST,
+            );
           }
         }
       }
@@ -90,7 +91,13 @@ export class AttendanceService {
             orderOption[column] = order.toUpperCase();
           } else {
             // If sort key is invalid, return a BadRequest response
-            return APIResponse.error(response, apiId, "BAD_REQUEST", `${column} Invalid sort key`,HttpStatus.BAD_REQUEST);
+            return APIResponse.error(
+              response,
+              apiId,
+              'BAD_REQUEST',
+              `${column} Invalid sort key`,
+              HttpStatus.BAD_REQUEST,
+            );
           }
         }
 
@@ -109,7 +116,13 @@ export class AttendanceService {
         //     attendanceList: paginatedAttendanceList,
         //   },
         // });
-        return APIResponse.success(response,apiId,{attendanceList: paginatedAttendanceList},HttpStatus.OK,"Ateendance List Fetched Successfully");
+        return APIResponse.success(
+          response,
+          apiId,
+          { attendanceList: { data: paginatedAttendanceList } },
+          HttpStatus.OK,
+          'Ateendance List Fetched Successfully',
+        );
       }
 
       if (facets && facets.length > 0) {
@@ -126,8 +139,13 @@ export class AttendanceService {
             //   statusCode: HttpStatus.BAD_REQUEST,
             //   errorMessage: `${facet} Invalid facet`,
             // });
-            return APIResponse.error(response, apiId, "BAD_REQUEST", `${facet} Invalid facet`,HttpStatus.BAD_REQUEST);
-            
+            return APIResponse.error(
+              response,
+              apiId,
+              'BAD_REQUEST',
+              `${facet} Invalid facet`,
+              HttpStatus.BAD_REQUEST,
+            );
           }
 
           facetFields.push({ name: facet, field: facet });
@@ -144,7 +162,13 @@ export class AttendanceService {
           });
 
           if (!tree) {
-            return APIResponse.error(response,apiId,"Invalid Sort Key","BAD_REQUEST",HttpStatus.BAD_REQUEST);
+            return APIResponse.error(
+              response,
+              apiId,
+              'Invalid Sort Key',
+              'BAD_REQUEST',
+              HttpStatus.BAD_REQUEST,
+            );
           }
           result[field] = tree[field];
         }
@@ -157,24 +181,42 @@ export class AttendanceService {
         //     result: result,
         //   },
         // });
-        return APIResponse.success(response,apiId,result,HttpStatus.OK,"Ateendance List Fetched Successfully");
+        return APIResponse.success(
+          response,
+          apiId,
+          {
+            data: {
+              result: result,
+            },
+          },
+          HttpStatus.OK,
+          'Ateendance List Fetched Successfully',
+        );
       }
     } catch (error) {
-      const errorMessage = error.message || "Internal Server Error";
-      return APIResponse.error(response,apiId,"INTERNAL_SERVER_ERROR",errorMessage,HttpStatus.INTERNAL_SERVER_ERROR)
+      const errorMessage = error.message || 'Internal Server Error';
+      return APIResponse.error(
+        response,
+        apiId,
+        'INTERNAL_SERVER_ERROR',
+        errorMessage,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
-  async findAttendance(userId,contextId,date){
-   let data = await this.attendanceRepository.findOne({
-    where:{
-      userId,contextId,attendanceDate:date
+  async findAttendance(userId, contextId, date) {
+    let data = await this.attendanceRepository.findOne({
+      where: {
+        userId,
+        contextId,
+        attendanceDate: date,
+      },
+    });
+    if (!data) {
+      return null;
     }
-   })
-   if(!data){
-    return null;
-   }
-   return data;
+    return data;
   }
 
   async facetedSearch({ data, facets, sort }) {
@@ -186,9 +228,9 @@ export class AttendanceService {
       if (attendanceValue) {
         attendanceKeys.add(attendanceValue);
       }
-    //   if (item.attendanceDate) {
-    //     attendanceKeys.add("attendanceDate");
-    // }
+      //   if (item.attendanceDate) {
+      //     attendanceKeys.add("attendanceDate");
+      // }
     });
 
     // Iterate over facets
@@ -245,7 +287,11 @@ export class AttendanceService {
       if (sort) {
         const [sortField, sortOrder] = sort;
         const validSortKey = `${sortField.replace('_percentage', '')}_percentage`;
-        if (!attendanceKeys.has(sortField.replace("_percentage", "")) && sortField !== 'present_percentage' && sortField !== 'absent_percentage') {
+        if (
+          !attendanceKeys.has(sortField.replace('_percentage', '')) &&
+          sortField !== 'present_percentage' &&
+          sortField !== 'absent_percentage'
+        ) {
           return false;
         }
 
@@ -324,35 +370,35 @@ export class AttendanceService {
   //     }
 
   //     let query = `
-  //               SELECT 
+  //               SELECT
   //                   u."userId",
   //                   u."name",
-  //                   CASE 
+  //                   CASE
   //                       WHEN aa_stats."total_attendance" = 0 THEN '-'
   //                       ELSE ROUND((aa_stats."present_count" * 100.0) / aa_stats."total_attendance", 0)::text
   //                   END AS attendance_percentage
-  //               FROM 
-  //                   public."Users" AS u  
-  //               INNER JOIN 
+  //               FROM
+  //                   public."Users" AS u
+  //               INNER JOIN
   //                   public."CohortMembers" AS cm ON cm."userId" = u."userId"
-  //               LEFT JOIN 
+  //               LEFT JOIN
   //                   (
-  //                       SELECT 
+  //                       SELECT
   //                           aa."userId",
   //                           COUNT(*) AS "total_attendance",
   //                           COUNT(CASE WHEN aa."attendance" = 'present' THEN 1 END) AS "present_count"
-  //                       FROM 
+  //                       FROM
   //                           public."Attendance" AS aa
-  //                       ${dateFilter} 
-  //                       GROUP BY 
+  //                       ${dateFilter}
+  //                       GROUP BY
   //                           aa."userId"
   //                   ) AS aa_stats ON cm."userId" = aa_stats."userId"
-  //               WHERE 
-  //                   cm."cohortId" = $1 
+  //               WHERE
+  //                   cm."cohortId" = $1
   //                   AND cm."role" = 'student'
   //                   ${nameFilter}
   //                   ${userFilter}
-  //               GROUP BY 
+  //               GROUP BY
   //                   u."userId", u."name", aa_stats."total_attendance", aa_stats."present_count"
   //           `;
 
@@ -384,35 +430,35 @@ export class AttendanceService {
   //       const countquery = `
   //                   SELECT ROUND(AVG(attendance_percentage::NUMERIC), 2) AS average_attendance_percentage
   //                   FROM (
-  //                       SELECT 
+  //                       SELECT
   //                           u."userId",
   //                           u."name",
-  //                           CASE 
+  //                           CASE
   //                               WHEN aa_stats."total_attendance" = 0 THEN '-'
   //                               ELSE ROUND((aa_stats."present_count" * 100.0) / aa_stats."total_attendance", 0)::text
   //                           END AS attendance_percentage
-  //                       FROM 
-  //                           public."Users" AS u  
-  //                       INNER JOIN 
+  //                       FROM
+  //                           public."Users" AS u
+  //                       INNER JOIN
   //                           public."CohortMembers" AS cm ON cm."userId" = u."userId"
-  //                       LEFT JOIN 
+  //                       LEFT JOIN
   //                           (
-  //                               SELECT 
+  //                               SELECT
   //                                   aa."userId",
   //                                   COUNT(*) AS "total_attendance",
   //                                   COUNT(CASE WHEN aa."attendance" = 'present' THEN 1 END) AS "present_count"
-  //                               FROM 
+  //                               FROM
   //                                   public."Attendance" AS aa
-  //                               ${dateFilter} 
-  //                               GROUP BY 
+  //                               ${dateFilter}
+  //                               GROUP BY
   //                                   aa."userId"
   //                           ) AS aa_stats ON cm."userId" = aa_stats."userId"
-  //                       WHERE 
-  //                           cm."cohortId" = $1 
+  //                       WHERE
+  //                           cm."cohortId" = $1
   //                           AND cm."role" = 'student'
   //                           ${nameFilter}
   //                           ${userFilter}
-  //                       GROUP BY 
+  //                       GROUP BY
   //                           u."userId", u."name", aa_stats."total_attendance", aa_stats."present_count"
   //                   ) AS subquery`;
 
@@ -515,15 +561,24 @@ export class AttendanceService {
     */
 
   public async updateAttendanceRecord(
-    loginUserId:string,
+    loginUserId: string,
     attendanceDto: AttendanceDto,
-    res: Response
+    res: Response,
   ) {
     let apiId = 'api.post.createAttendanceRecord';
     try {
-      const attendanceFound = await this.updateAttendance(attendanceDto,loginUserId);
+      const attendanceFound = await this.updateAttendance(
+        attendanceDto,
+        loginUserId,
+      );
       if (attendanceFound) {
-       return APIResponse.success(res,apiId,attendanceFound,HttpStatus.OK,"Attendance updated successfully");
+        return APIResponse.success(
+          res,
+          apiId,
+          attendanceFound,
+          HttpStatus.OK,
+          'Attendance updated successfully',
+        );
       } else {
         if (!attendanceDto.scope) {
           attendanceDto.scope = 'student';
@@ -531,11 +586,23 @@ export class AttendanceService {
         attendanceDto.createdBy = loginUserId;
         attendanceDto.updatedBy = loginUserId;
         let attendanceCreated = await this.createAttendance(attendanceDto);
-        return APIResponse.success(res,apiId,attendanceCreated,HttpStatus.CREATED,"Attendance created successfully");
+        return APIResponse.success(
+          res,
+          apiId,
+          attendanceCreated,
+          HttpStatus.CREATED,
+          'Attendance created successfully',
+        );
       }
     } catch (e) {
-      const errorMessage = e.message || "Internal Server Error";
-      return APIResponse.error(res, apiId, "Internal Server Error", errorMessage,HttpStatus.INTERNAL_SERVER_ERROR);
+      const errorMessage = e.message || 'Internal Server Error';
+      return APIResponse.error(
+        res,
+        apiId,
+        'Internal Server Error',
+        errorMessage,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -544,19 +611,27 @@ export class AttendanceService {
     */
   public async updateAttendance(
     attendanceDto: AttendanceDto,
-    loginUserId:string,
+    loginUserId: string,
   ) {
     try {
-      attendanceDto.updatedBy=loginUserId;
-      let attendancefound = await this.findAttendance(attendanceDto.userId,attendanceDto.contextId,attendanceDto.attendanceDate);
-      if(!attendancefound){
+      attendanceDto.updatedBy = loginUserId;
+      let attendancefound = await this.findAttendance(
+        attendanceDto.userId,
+        attendanceDto.contextId,
+        attendanceDto.attendanceDate,
+      );
+      if (!attendancefound) {
         return false;
       }
-      let data = this.attendanceRepository.merge(attendancefound, attendanceDto);
-      const updatedAttendanceRecord = await this.attendanceRepository.save(data);
+      let data = this.attendanceRepository.merge(
+        attendancefound,
+        attendanceDto,
+      );
+      const updatedAttendanceRecord =
+        await this.attendanceRepository.save(data);
       return updatedAttendanceRecord;
     } catch (error) {
-     return error;
+      return error;
     }
   }
 
@@ -565,8 +640,8 @@ export class AttendanceService {
       const attendance = this.attendanceRepository.create(attendanceDto);
       const result = await this.attendanceRepository.save(attendance);
       return result;
-    } catch (error) { 
-        throw error;
+    } catch (error) {
+      throw error;
     }
   }
 
@@ -632,64 +707,91 @@ export class AttendanceService {
     @body Array of objects containing attendance details of user (AttendanceDto)
     */
 
-    public async multipleAttendance(
-      tenantId: string,
-      request: any,
-      attendanceData: BulkAttendanceDTO,
-      res: Response
-    ) {
-      const loginUserId = request.user.userId;
-      const results = [];
-      const errors = [];
-      let apiId = 'api.post.bulkAttendance';
-    
-      try {
-        let count = 0;
-    
-        for (let attendance of attendanceData.userAttendance) {
-          const userAttendance = new AttendanceDto({
-            attendanceDate: attendanceData.attendanceDate,
-            contextId: attendanceData?.contextId,
-            scope: attendanceData?.scope,
-            attendance: attendance?.attendance,
-            userId: attendance?.userId,
-            tenantId: tenantId,
-            remark: attendance?.remark,
-            latitude: attendance?.latitude,
-            longitude: attendance?.longitude,
-            image: attendance?.image,
-            metaData: attendance?.metaData,
-            syncTime: attendance?.syncTime,
-            session: attendance?.session,
-            contextType: attendance?.contextType,
-            createdBy:loginUserId,
-            updatedBy:loginUserId
-          });
-    
-          try {
-            const attendanceRes = await this.updateAttendance(userAttendance, loginUserId);
-            if (!attendanceRes) {
-              let createAttendance = await this.createAttendance(userAttendance);
-              results.push({ status: 'created', attendance: createAttendance });
-            } else {
-              results.push({ status: 'updated', attendance: attendanceRes });
-            }
-            count++;
-          } catch (e) {
-            errors.push({ attendance, error: e.message });
+  public async multipleAttendance(
+    tenantId: string,
+    request: any,
+    attendanceData: BulkAttendanceDTO,
+    res: Response,
+  ) {
+    const loginUserId = request.user.userId;
+    const results = [];
+    const errors = [];
+    let apiId = 'api.post.bulkAttendance';
+
+    try {
+      let count = 0;
+
+      for (let attendance of attendanceData.userAttendance) {
+        const userAttendance = new AttendanceDto({
+          attendanceDate: attendanceData.attendanceDate,
+          contextId: attendanceData?.contextId,
+          scope: attendanceData?.scope,
+          attendance: attendance?.attendance,
+          userId: attendance?.userId,
+          tenantId: tenantId,
+          remark: attendance?.remark,
+          latitude: attendance?.latitude,
+          longitude: attendance?.longitude,
+          image: attendance?.image,
+          metaData: attendance?.metaData,
+          syncTime: attendance?.syncTime,
+          session: attendance?.session,
+          contextType: attendance?.contextType,
+          createdBy: loginUserId,
+          updatedBy: loginUserId,
+        });
+
+        try {
+          const attendanceRes = await this.updateAttendance(
+            userAttendance,
+            loginUserId,
+          );
+          if (!attendanceRes) {
+            let createAttendance = await this.createAttendance(userAttendance);
+            results.push({ status: 'created', attendance: createAttendance });
+          } else {
+            results.push({ status: 'updated', attendance: attendanceRes });
           }
+          count++;
+        } catch (e) {
+          errors.push({ attendance, error: e.message });
         }
-        if (errors.length > 0) {
-          if(!results.length){
-            return APIResponse.error(res, apiId, "BAD_REQUEST", `Attendance Can not be created or updated.Error is ${errors[0].error}`, HttpStatus.BAD_REQUEST);
-          }
-          return APIResponse.success(res, apiId, { count: count, errors: errors, successresults: results }, HttpStatus.CREATED, "Bulk Attendance Processed with some errors");
-        } else {
-          return APIResponse.success(res, apiId, { count: count, results: results }, HttpStatus.CREATED, "Bulk Attendance Updated successfully");
-        }
-      } catch (e) {
-        const errorMessage = e.message || "Internal Server Error";
-        return APIResponse.error(res, apiId, "Internal Server Error", errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
       }
+      if (errors.length > 0) {
+        if (!results.length) {
+          return APIResponse.error(
+            res,
+            apiId,
+            'BAD_REQUEST',
+            `Attendance Can not be created or updated.Error is ${errors[0].error}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        return APIResponse.success(
+          res,
+          apiId,
+          { count: count, errors: errors, successresults: results },
+          HttpStatus.CREATED,
+          'Bulk Attendance Processed with some errors',
+        );
+      } else {
+        return APIResponse.success(
+          res,
+          apiId,
+          { count: count, results: results },
+          HttpStatus.CREATED,
+          'Bulk Attendance Updated successfully',
+        );
+      }
+    } catch (e) {
+      const errorMessage = e.message || 'Internal Server Error';
+      return APIResponse.error(
+        res,
+        apiId,
+        'Internal Server Error',
+        errorMessage,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
+  }
 }

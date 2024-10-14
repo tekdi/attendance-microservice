@@ -49,6 +49,4 @@ export class AxiosRequest {
       });
     return response;
   }
-
-  
 }

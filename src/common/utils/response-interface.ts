@@ -1,4 +1,3 @@
-import { IsOptional } from "class-validator";
 
 // structure for server responses
 export interface ServerResponse {

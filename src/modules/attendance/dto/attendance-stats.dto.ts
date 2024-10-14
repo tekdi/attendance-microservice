@@ -77,23 +77,17 @@ export class AttendanceStatsDto {
     @Expose()
     contextId: string;
 
-  
     @Expose()
     attendance_percentage: string;
-
 
     @Expose()
     userId: string;
 
-  
     @Expose()
     attendanceDate: Date;
 
- 
     @Expose()
     attendance: string;
-
-
 
     @ApiProperty({
         type: Number,
@@ -113,12 +107,12 @@ export class AttendanceStatsDto {
     @ApiProperty({
         type: FiltersDto,
         description: "Filters",
-      })
-      @ApiPropertyOptional()
-      @ValidateNested({ each: true })
-     @Type(() => FiltersDto)
+    })
+    @ApiPropertyOptional()
+    @ValidateNested({ each: true })
+    @Type(() => FiltersDto)
 
-      filters: FiltersDto
+    filters: FiltersDto
 
     constructor(obj: Partial<AttendanceStatsDto>) {
         Object.assign(this, obj);

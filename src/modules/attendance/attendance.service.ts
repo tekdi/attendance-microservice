@@ -119,7 +119,8 @@ export class AttendanceService {
         return APIResponse.success(
           response,
           apiId,
-          { attendanceList: { data: paginatedAttendanceList } },
+          //{ attendanceList: { data: paginatedAttendanceList } },
+          { data: { attendanceList: paginatedAttendanceList } },
           HttpStatus.OK,
           'Ateendance List Fetched Successfully',
         );

@@ -35,7 +35,7 @@ import { JwtAuthGuard } from 'src/common/guards/keycloak.guard';
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
-  @Post('create')
+  @Post()
   @ApiBasicAuth('access-token')
   @ApiCreatedResponse({
     description: 'Attendance has been created successfully.',

@@ -575,7 +575,7 @@ export class AttendanceService {
         return APIResponse.success(
           res,
           apiId,
-          attendanceFound,
+          { data: attendanceFound },
           HttpStatus.OK,
           'Attendance updated successfully',
         );
@@ -589,7 +589,7 @@ export class AttendanceService {
         return APIResponse.success(
           res,
           apiId,
-          attendanceCreated,
+          { data: attendanceCreated },
           HttpStatus.CREATED,
           'Attendance created successfully',
         );
@@ -778,7 +778,7 @@ export class AttendanceService {
         return APIResponse.success(
           res,
           apiId,
-          { count: count, results: results },
+          { totalCount: count, responses: results },
           HttpStatus.CREATED,
           'Bulk Attendance Updated successfully',
         );

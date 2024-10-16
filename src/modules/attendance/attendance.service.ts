@@ -125,7 +125,6 @@ export class AttendanceService {
           'Ateendance List Fetched Successfully',
         );
       }
-
       if (facets && facets.length > 0) {
         attendanceList = await this.attendanceRepository.find({
           where: whereClause, // Apply sorting option

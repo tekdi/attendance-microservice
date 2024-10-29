@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - image:  ${ECR_REPOSITORY}:${IMAGE_TAG}
-        imagePullPolicy: ""
+        imagePullPolicy: "Always"
         name: attendance-service
         envFrom:
         - configMapRef:

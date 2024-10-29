@@ -37,6 +37,7 @@ jobs:
            echo "Current Working Directory: pwd"
            pwd
            ls -ltra
+           git log -n 3
     - name: Creating Dockerfile
       env:
        DOCKERFILE_FILE_CONTENT: ${{ secrets.DOCKERFILE_FILE_CONTENT }}

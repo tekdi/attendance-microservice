@@ -31,7 +31,7 @@ import { JwtAuthGuard } from 'src/common/guards/keycloak.guard';
 
 @ApiTags('Attendance')
 @Controller('attendance')
-@UseGuards(JwtAuthGuard)
+
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
@@ -45,6 +45,7 @@ export class AttendanceController {
     name: 'tenantid',
   })
   @UsePipes(ValidationPipe)
+  @UseGuards(JwtAuthGuard)
   public async createAttendace(
     @Headers() headers,
     @Req() request,
@@ -120,6 +121,7 @@ export class AttendanceController {
     name: 'tenantid',
   })
   @UsePipes(ValidationPipe)
+  @UseGuards(JwtAuthGuard)
   public async multipleAttendance(
     @Headers() headers,
     @Req() request: Request,

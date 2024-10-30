@@ -1,4 +1,4 @@
-name: Event-Management-Service Deployment on Pratham-dev in OU
+name: QA Attendance Service Deployment 
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  deploy:
+  deploy_QA:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

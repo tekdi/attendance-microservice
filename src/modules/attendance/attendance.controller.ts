@@ -7,6 +7,7 @@ import {
   ApiHeader,
   ApiBadRequestResponse,
   ApiInternalServerErrorResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import {
   Controller,
@@ -20,18 +21,17 @@ import {
   UsePipes,
   ValidationPipe,
   Res,
-  UseGuards,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { AttendanceDto, BulkAttendanceDTO } from './dto/attendance.dto';
 import { AttendanceSearchDto } from './dto/attendance-search.dto';
 import { Response } from 'express';
 import { AttendanceService } from './attendance.service';
-import { JwtAuthGuard } from 'src/common/guards/keycloak.guard';
+
 
 @ApiTags('Attendance')
 @Controller('attendance')
-
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
@@ -44,17 +44,15 @@ export class AttendanceController {
   @ApiHeader({
     name: 'tenantid',
   })
+  @ApiQuery({ name: 'userId', required: true, type: 'string' })
   @UsePipes(ValidationPipe)
-  @UseGuards(JwtAuthGuard)
-  public async createAttendace(
+  public async createAttendance(
     @Headers() headers,
-    @Req() request,
     @Body() attendanceDto: AttendanceDto,
     @Res() response: Response,
+    @Query('userId') userId: string, // Now using userId from query
     @UploadedFile() image,
   ) {
-    let userId = request?.user?.userId;
-    attendanceDto.tenantId = headers['tenantid'];
     if (!headers['tenantid']) {
       return response.status(HttpStatus.BAD_REQUEST).json({
         statusCode: HttpStatus.BAD_REQUEST,
@@ -62,11 +60,12 @@ export class AttendanceController {
       });
     }
 
+    attendanceDto.tenantId = headers['tenantid'];
     attendanceDto.image = image?.filename;
-    //currently set default value to student
-    attendanceDto.scope = 'student';
+    attendanceDto.scope = 'student'; // Set default value to 'student'
+
     const result = await this.attendanceService.updateAttendanceRecord(
-      userId,
+      userId, // Pass userId from query param
       attendanceDto,
       response,
     );
@@ -120,26 +119,26 @@ export class AttendanceController {
   @ApiHeader({
     name: 'tenantid',
   })
+  @ApiQuery({ name: 'userId', required: true, type: 'string' })
   @UsePipes(ValidationPipe)
-  @UseGuards(JwtAuthGuard)
   public async multipleAttendance(
     @Headers() headers,
-    @Req() request: Request,
     @Res() response: Response,
     @Body() attendanceDtos: BulkAttendanceDTO,
+    @Query('userId') userId: string, // Now using userId from query
   ) {
-    let tenantId = headers['tenantid'];
+    const tenantId = headers['tenantid'];
     if (!tenantId) {
       return response.status(HttpStatus.BAD_REQUEST).json({
         statusCode: HttpStatus.BAD_REQUEST,
         errorMessage: 'tenantId is missing in headers',
       });
     }
-    //currently set default value to student
-    attendanceDtos.scope = 'student';
+
+    attendanceDtos.scope = 'student'; // Set default value to 'student'
     const result = await this.attendanceService.multipleAttendance(
       tenantId,
-      request,
+      userId , // Pass userId from query param
       attendanceDtos,
       response,
     );

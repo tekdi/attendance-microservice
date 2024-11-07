@@ -43,7 +43,7 @@ export class AttendanceEntity {
   session: string;
 
   @Column({ nullable: true })
-  contextType: string;
+  context: string;
 
   @Column({ nullable: true })
   contextId: string;

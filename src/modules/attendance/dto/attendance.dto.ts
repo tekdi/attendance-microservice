@@ -70,22 +70,18 @@ export class AttendanceDto {
   @IsEnum(Attendance, { message: "Please enter valid enum values for attendance [present, absent,on-leave]" })
   attendance: string;
 
-
   @Expose()
   @ApiPropertyOptional()
   remark: string;
 
- 
   @Expose()
   @ApiPropertyOptional()
   latitude: number;
 
-  
   @Expose()
   @ApiPropertyOptional()
   longitude: number;
 
-  
   @Expose()
   @ApiPropertyOptional()
   image: string;
@@ -104,11 +100,12 @@ export class AttendanceDto {
 
   @ApiPropertyOptional({
     type: String,
-    description: "The contextType of the attendance",
+    description: "The context of the attendance",
     default: "",
   })
   @Expose()
-  contextType: string;
+  @IsNotEmpty()
+  context: string;
 
   @ApiProperty({
     type: String,
@@ -195,13 +192,7 @@ export class UserAttendanceDTO {
   @Expose()
   session: string;
 
-  @ApiPropertyOptional({
-    type: String,
-    description: "The contextType of the attendance",
-    default: "",
-  })
-  @Expose()
-  contextType: string;
+
 }
 
 export class BulkAttendanceDTO {
@@ -221,14 +212,20 @@ export class BulkAttendanceDTO {
   @Expose()
   @IsNotEmpty()
   @ApiProperty()
-
   contextId: string;
+
+  @ApiProperty({
+    type: String,
+    description: "The context of the attendance",
+  })
+  @IsNotEmpty()
+  @Expose()
+  context: string;
 
   @ApiPropertyOptional()
   @ValidateIf(o => o.scope !== undefined && o.scope !== null)
   @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, student]" })
   scope: string
-
 
   @ApiProperty({
     type: [UserAttendanceDTO], // Specify the type of userAttendance as an array of UserAttendanceDTO

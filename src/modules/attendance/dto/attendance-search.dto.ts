@@ -41,6 +41,10 @@ export class AttendanceFiltersDto {
   contextId?: string
 
   @ApiPropertyOptional()
+  @IsOptional()
+  context?: string
+
+  @ApiPropertyOptional()
   scope?: string
 
   @ApiPropertyOptional({
@@ -51,7 +55,6 @@ export class AttendanceFiltersDto {
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Please provide a valid date in the format yyyy-mm-dd' })
   attendanceDate?: Date
-
 
   @ApiPropertyOptional()
   @IsUUID()

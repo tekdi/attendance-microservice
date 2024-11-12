@@ -17,7 +17,7 @@ export class AttendanceService {
     private configService: ConfigService,
     @InjectRepository(AttendanceEntity)
     private attendanceRepository: Repository<AttendanceEntity>,
-  ) {}
+  ) { }
 
   /*
     Method to search attendance for all or for the key value pair provided in filter object 
@@ -155,6 +155,7 @@ export class AttendanceService {
         // Process the data to calculate counts based on facets
         for (const facet of facetFields) {
           const { field } = facet;
+          console.log(field, "field")
           const tree = await this.facetedSearch({
             data: attendanceList,
             facets: [facet],
@@ -725,6 +726,7 @@ export class AttendanceService {
         const userAttendance = new AttendanceDto({
           attendanceDate: attendanceData.attendanceDate,
           contextId: attendanceData?.contextId,
+          context: attendanceData?.context,
           scope: attendanceData?.scope,
           attendance: attendance?.attendance,
           userId: attendance?.userId,
@@ -736,7 +738,6 @@ export class AttendanceService {
           metaData: attendance?.metaData,
           syncTime: attendance?.syncTime,
           session: attendance?.session,
-          contextType: attendance?.contextType,
           createdBy: loginUserId,
           updatedBy: loginUserId,
         });
@@ -795,3 +796,5 @@ export class AttendanceService {
     }
   }
 }
+
+// event , cohort

@@ -8,9 +8,6 @@ import { AttendanceDto, BulkAttendanceDTO } from './dto/attendance.dto';
 import APIResponse from 'src/common/utils/response';
 import { Response } from 'express';
 
-// import { CohortMembers } from 'src/cohortMembers/entities/cohort-member.entity';
-// const facetedSearch = require('in-memory-faceted-search');
-
 @Injectable()
 export class AttendanceService {
   constructor(
@@ -33,7 +30,7 @@ export class AttendanceService {
     let apiId = 'api.post.seacrhAttendance';
     try {
       let { limit, page, filters, facets, sort } = attendanceSearchDto;
-      // Set default limit to 0 if not provided
+      // Set default limit to 20 if not provided
       if (!limit) {
         limit = 20;
       }
@@ -45,13 +42,15 @@ export class AttendanceService {
       }
 
       // Get column names from metadata
+     
       const attendanceKeys = this.attendanceRepository.metadata.columns.map(
         (column) => column.propertyName,
       );
 
-      let whereClause: any = { tenantId };
       // Default WHERE clause for filtering by tenantId
+      let whereClause: any = { tenantId };
 
+      // construct where clause from filters
       if (filters && Object.keys(filters).length > 0) {
         for (const [key, value] of Object.entries(filters)) {
           if (attendanceKeys.includes(key)) {
@@ -69,7 +68,7 @@ export class AttendanceService {
             // Construct the whereClause with the date range using Between
             whereClause['attendanceDate'] = Between(fromDate, toDate);
           } else {
-            // If filter key is invalid, return a BadRequest response
+            // If filter key is invalid (key should be a part of columns), return a BadRequest response
             return APIResponse.error(
               response,
               apiId,
@@ -83,11 +82,12 @@ export class AttendanceService {
 
       let attendanceList;
 
-      if (!facets) {
+      if (!facets || facets.length === 0) {
+        // no facets
         let orderOption: any = {};
         if (sort && Array.isArray(sort) && sort.length === 2) {
-          const [column, order] = sort;
-          if (attendanceKeys.includes(column)) {
+          const [column, order] = sort;  // sort on given column
+          if (attendanceKeys.includes(column)) { // column to be sorted should exist
             orderOption[column] = order.toUpperCase();
           } else {
             // If sort key is invalid, return a BadRequest response
@@ -95,7 +95,7 @@ export class AttendanceService {
               response,
               apiId,
               'BAD_REQUEST',
-              `${column} Invalid sort key`,
+              `${column} Invalid sort key provide column name`,
               HttpStatus.BAD_REQUEST,
             );
           }
@@ -109,25 +109,20 @@ export class AttendanceService {
           offset,
           offset + limit,
         );
-        // return new SuccessResponse({
-        //   statusCode: HttpStatus.OK,
-        //   message: 'Ok.',
-        //   data: {
-        //     attendanceList: paginatedAttendanceList,
-        //   },
-        // });
+
         return APIResponse.success(
           response,
           apiId,
-          //{ attendanceList: { data: paginatedAttendanceList } },
           { data: { attendanceList: paginatedAttendanceList } },
           HttpStatus.OK,
           'Ateendance List Fetched Successfully',
         );
       }
       if (facets && facets.length > 0) {
+        // absent_percentage and present_percentage is valid sort key when facets are provided
+      
         attendanceList = await this.attendanceRepository.find({
-          where: whereClause, // Apply sorting option
+          where: whereClause,
         });
 
         let facetFields = [];
@@ -135,10 +130,7 @@ export class AttendanceService {
         for (const facet of facets) {
           if (!attendanceKeys.includes(facet)) {
             // If facet is not present in attendanceKeys, return a BadRequest response
-            // return new ErrorResponseTypeOrm({
-            //   statusCode: HttpStatus.BAD_REQUEST,
-            //   errorMessage: `${facet} Invalid facet`,
-            // });
+
             return APIResponse.error(
               response,
               apiId,
@@ -152,21 +144,20 @@ export class AttendanceService {
         }
 
         let result = {};
-        // Process the data to calculate counts based on facets
+        // Process the data to calculate counts based on each facet
         for (const facet of facetFields) {
           const { field } = facet;
-          console.log(field, "field")
-          const tree = await this.facetedSearch({
-            data: attendanceList,
-            facets: [facet],
+          const tree = await this.facetedSearch(
+            attendanceList,
+            [facet],
             sort,
-          });
+          );
 
           if (!tree) {
             return APIResponse.error(
               response,
               apiId,
-              'Invalid Sort Key',
+              'Invalid Sort Key for facets it has to be present_percentage or absent_percentage',
               'BAD_REQUEST',
               HttpStatus.BAD_REQUEST,
             );
@@ -174,14 +165,6 @@ export class AttendanceService {
           result[field] = tree[field];
         }
 
-        // Return success response with counts
-        // return new SuccessResponse({
-        //   statusCode: HttpStatus.OK,
-        //   message: 'Ok.',
-        //   data: {
-        //     result: result,
-        //   },
-        // });
         return APIResponse.success(
           response,
           apiId,
@@ -220,18 +203,19 @@ export class AttendanceService {
     return data;
   }
 
-  async facetedSearch({ data, facets, sort }) {
+  async facetedSearch(attendanceRecords, facets, sort) {
+    // for each facet provided (facet is a column in table) calculate absent_percentage and present_percentage along with present and absent count for unique records 
+
     const tree = {};
     const attendanceKeys = new Set<string>();
     // Populate attendanceKeys with distinct attendance values
-    data.forEach((item) => {
+
+    // for each data collect unique record
+    attendanceRecords.forEach((item) => {
       const attendanceValue = item.attendance;
       if (attendanceValue) {
         attendanceKeys.add(attendanceValue);
       }
-      //   if (item.attendanceDate) {
-      //     attendanceKeys.add("attendanceDate");
-      // }
     });
 
     // Iterate over facets
@@ -242,7 +226,7 @@ export class AttendanceService {
       tree[field] = {};
 
       // Iterate over data to count occurrences of each field value
-      for (const item of data) {
+      for (const item of attendanceRecords) {
         const value = item[field];
         const attendanceValue = item['attendance'];
 
@@ -288,6 +272,7 @@ export class AttendanceService {
       if (sort) {
         const [sortField, sortOrder] = sort;
         const validSortKey = `${sortField.replace('_percentage', '')}_percentage`;
+  
         if (
           !attendanceKeys.has(sortField.replace('_percentage', '')) &&
           sortField !== 'present_percentage' &&

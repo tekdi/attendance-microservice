@@ -547,7 +547,7 @@ export class AttendanceService {
     */
 
   public async updateAttendanceRecord(
-    loginUserId: string,
+    loginUserId: string| null,
     attendanceDto: AttendanceDto,
     res: Response,
   ) {
@@ -695,11 +695,11 @@ export class AttendanceService {
 
   public async multipleAttendance(
     tenantId: string,
-    request: any,
+    userId: string | null,
     attendanceData: BulkAttendanceDTO,
     res: Response,
   ) {
-    const loginUserId = request.user.userId;
+    const loginUserId = userId;
     const results = [];
     const errors = [];
     let apiId = 'api.post.bulkAttendance';

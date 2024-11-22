@@ -174,7 +174,7 @@ export class AttendanceService {
             },
           },
           HttpStatus.OK,
-          'Ateendance List Fetched Successfully',
+          'Attendance List Fetched Successfully',
         );
       }
     } catch (error) {

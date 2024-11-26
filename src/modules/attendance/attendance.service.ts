@@ -27,7 +27,7 @@ export class AttendanceService {
     attendanceSearchDto: AttendanceSearchDto,
     response: Response,
   ) {
-    let apiId = 'api.post.searchAttendance';
+    const apiId = 'api.post.searchAttendance';
     try {
       let { limit, page, filters, facets, sort } = attendanceSearchDto;
       // Set default limit to 20 if not provided

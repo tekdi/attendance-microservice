@@ -36,7 +36,6 @@ export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @Post()
-  @ApiBasicAuth('access-token')
   @ApiCreatedResponse({
     description: 'Attendance has been created successfully.',
   })
@@ -73,7 +72,6 @@ export class AttendanceController {
   }
 
   @Post('list')
-  @ApiBasicAuth('access-token')
   @ApiOkResponse({ description: 'Attendance List' })
   @ApiBadRequestResponse({ description: 'Bad Request' })
   @ApiInternalServerErrorResponse({ description: 'Internal Server Error' })
@@ -91,6 +89,7 @@ export class AttendanceController {
     @Req() request: Request,
     @Body() studentSearchDto: AttendanceSearchDto,
     @Res() response: Response,
+    @Query('userId') userId: string,
   ) {
     let tenantid = headers['tenantid'];
     if (!tenantid) {
@@ -108,7 +107,6 @@ export class AttendanceController {
   }
 
   @Post('bulkAttendance')
-  @ApiBasicAuth('access-token')
   @ApiCreatedResponse({
     description: 'Attendance has been created successfully.',
   })

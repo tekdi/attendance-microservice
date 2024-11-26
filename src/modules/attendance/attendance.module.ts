@@ -3,7 +3,6 @@ import { AttendanceService } from './attendance.service';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceEntity } from './entities/attendance.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtStrategy } from "src/common/guards/keycloak.strategy";
 import { LoggerService } from 'src/common/logger/logger.service';
 
 @Module({
@@ -11,6 +10,6 @@ import { LoggerService } from 'src/common/logger/logger.service';
     TypeOrmModule.forFeature([AttendanceEntity]),
   ],
   controllers: [AttendanceController],
-  providers: [AttendanceService, JwtStrategy, LoggerService]
+  providers: [AttendanceService, LoggerService]
 })
 export class AttendanceModule { }

@@ -3,7 +3,6 @@ import {
   ApiBody,
   ApiOkResponse,
   ApiCreatedResponse,
-  ApiBasicAuth,
   ApiHeader,
   ApiBadRequestResponse,
   ApiInternalServerErrorResponse,

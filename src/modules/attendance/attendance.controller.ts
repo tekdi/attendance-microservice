@@ -88,7 +88,6 @@ export class AttendanceController {
     @Req() request: Request,
     @Body() studentSearchDto: AttendanceSearchDto,
     @Res() response: Response,
-    @Query('userId') userId: string,
   ) {
     let tenantid = headers['tenantid'];
     if (!tenantid) {

@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AttendanceEntity } from './entities/attendance.entity';
 import { Repository, Between, In } from 'typeorm';
@@ -7,13 +6,14 @@ import { AttendanceSearchDto } from './dto/attendance-search.dto';
 import { AttendanceDto, BulkAttendanceDTO } from './dto/attendance.dto';
 import APIResponse from 'src/common/utils/response';
 import { Response } from 'express';
+import { LoggerService } from 'src/common/logger/logger.service';
 
 @Injectable()
 export class AttendanceService {
   constructor(
-    private configService: ConfigService,
     @InjectRepository(AttendanceEntity)
-    private attendanceRepository: Repository<AttendanceEntity>,
+    private readonly attendanceRepository: Repository<AttendanceEntity>,
+    private readonly loggerService: LoggerService
   ) { }
 
   /*
@@ -27,7 +27,7 @@ export class AttendanceService {
     attendanceSearchDto: AttendanceSearchDto,
     response: Response,
   ) {
-    let apiId = 'api.post.seacrhAttendance';
+    const apiId = 'api.post.searchAttendance';
     try {
       let { limit, page, filters, facets, sort } = attendanceSearchDto;
       // Set default limit to 20 if not provided
@@ -42,7 +42,7 @@ export class AttendanceService {
       }
 
       // Get column names from metadata
-     
+
       const attendanceKeys = this.attendanceRepository.metadata.columns.map(
         (column) => column.propertyName,
       );
@@ -69,6 +69,10 @@ export class AttendanceService {
             whereClause['attendanceDate'] = Between(fromDate, toDate);
           } else {
             // If filter key is invalid (key should be a part of columns), return a BadRequest response
+            this.loggerService.error(
+              `Please Enter Valid Key to Search. Invalid Key entered Is ${key}`,
+              'BAD_REQUEST', apiId, JSON.stringify(attendanceSearchDto)
+            );
             return APIResponse.error(
               response,
               apiId,
@@ -91,6 +95,10 @@ export class AttendanceService {
             orderOption[column] = order.toUpperCase();
           } else {
             // If sort key is invalid, return a BadRequest response
+            this.loggerService.error(
+              `${column} Invalid sort key provide column name`,
+              'BAD_REQUEST', apiId, JSON.stringify(attendanceSearchDto)
+            );
             return APIResponse.error(
               response,
               apiId,
@@ -109,18 +117,22 @@ export class AttendanceService {
           offset,
           offset + limit,
         );
+        this.loggerService.log(
+          'Attendance List Fetched Successfully',
+          apiId,
 
+        );
         return APIResponse.success(
           response,
           apiId,
           { data: { attendanceList: paginatedAttendanceList } },
           HttpStatus.OK,
-          'Ateendance List Fetched Successfully',
+          'Attendance List Fetched Successfully',
         );
       }
       if (facets && facets.length > 0) {
         // absent_percentage and present_percentage is valid sort key when facets are provided
-      
+
         attendanceList = await this.attendanceRepository.find({
           where: whereClause,
         });
@@ -130,7 +142,10 @@ export class AttendanceService {
         for (const facet of facets) {
           if (!attendanceKeys.includes(facet)) {
             // If facet is not present in attendanceKeys, return a BadRequest response
-
+            this.loggerService.error(
+              `${facet} Invalid facet`,
+              'BAD_REQUEST', apiId, JSON.stringify(attendanceSearchDto)
+            );
             return APIResponse.error(
               response,
               apiId,
@@ -154,6 +169,10 @@ export class AttendanceService {
           );
 
           if (!tree) {
+            this.loggerService.error(
+              'Invalid Sort Key for facets it has to be present_percentage or absent_percentage',
+              'BAD_REQUEST', apiId, JSON.stringify(attendanceSearchDto)
+            );
             return APIResponse.error(
               response,
               apiId,
@@ -165,6 +184,10 @@ export class AttendanceService {
           result[field] = tree[field];
         }
 
+        this.loggerService.log(
+          'Attendance List Fetched Successfully',
+          apiId,
+        );
         return APIResponse.success(
           response,
           apiId,
@@ -179,6 +202,10 @@ export class AttendanceService {
       }
     } catch (error) {
       const errorMessage = error.message || 'Internal Server Error';
+      this.loggerService.error(
+        'INTERNAL_SERVER_ERROR',
+        errorMessage, apiId, JSON.stringify(attendanceSearchDto)
+      );
       return APIResponse.error(
         response,
         apiId,
@@ -272,7 +299,7 @@ export class AttendanceService {
       if (sort) {
         const [sortField, sortOrder] = sort;
         const validSortKey = `${sortField.replace('_percentage', '')}_percentage`;
-  
+
         if (
           !attendanceKeys.has(sortField.replace('_percentage', '')) &&
           sortField !== 'present_percentage' &&
@@ -547,7 +574,7 @@ export class AttendanceService {
     */
 
   public async updateAttendanceRecord(
-    loginUserId: string| null,
+    loginUserId: string | null,
     attendanceDto: AttendanceDto,
     res: Response,
   ) {
@@ -558,6 +585,11 @@ export class AttendanceService {
         loginUserId,
       );
       if (attendanceFound) {
+        this.loggerService.log(
+          'Attendance updated successfully',
+          apiId,
+          loginUserId
+        );
         return APIResponse.success(
           res,
           apiId,
@@ -572,6 +604,11 @@ export class AttendanceService {
         attendanceDto.createdBy = loginUserId;
         attendanceDto.updatedBy = loginUserId;
         let attendanceCreated = await this.createAttendance(attendanceDto);
+        this.loggerService.log(
+          'Attendance created successfully',
+          apiId,
+          loginUserId
+        );
         return APIResponse.success(
           res,
           apiId,
@@ -582,6 +619,10 @@ export class AttendanceService {
       }
     } catch (e) {
       const errorMessage = e.message || 'Internal Server Error';
+      this.loggerService.error(
+        'INTERNAL_SERVER_ERROR',
+        errorMessage, apiId, loginUserId
+      );
       return APIResponse.error(
         res,
         apiId,
@@ -745,6 +786,12 @@ export class AttendanceService {
       }
       if (errors.length > 0) {
         if (!results.length) {
+          this.loggerService.error(
+            'BAD_REQUEST',
+            `Attendance Can not be created or updated.Error is ${errors[0].error}`,
+            apiId,
+            userId
+          );
           return APIResponse.error(
             res,
             apiId,
@@ -753,6 +800,11 @@ export class AttendanceService {
             HttpStatus.BAD_REQUEST,
           );
         }
+        this.loggerService.log(
+          'Attendance created successfully',
+          apiId,
+          userId
+        );
         return APIResponse.success(
           res,
           apiId,
@@ -761,6 +813,11 @@ export class AttendanceService {
           'Bulk Attendance Processed with some errors',
         );
       } else {
+        this.loggerService.log(
+          'Attendance created successfully',
+          apiId,
+          userId
+        );
         return APIResponse.success(
           res,
           apiId,
@@ -771,6 +828,12 @@ export class AttendanceService {
       }
     } catch (e) {
       const errorMessage = e.message || 'Internal Server Error';
+      this.loggerService.error(
+        'Internal Server Error',
+        e.message,
+        apiId,
+        userId
+      );
       return APIResponse.error(
         res,
         apiId,
@@ -781,5 +844,3 @@ export class AttendanceService {
     }
   }
 }
-
-// event , cohort

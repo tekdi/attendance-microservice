@@ -46,8 +46,9 @@ jobs:
       run: |
           echo "Current Working Directory: pwd"
           pwd
-          ls -ltra manifest/
           cat Dockerfile
+          ls -ltra manifest/
+          
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:

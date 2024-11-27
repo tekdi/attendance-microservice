@@ -46,7 +46,8 @@ jobs:
       run: |
           echo "Current Working Directory: pwd"
           pwd
-          cat Dockerfile
+          ls -ltra
+          cat /home/runner/work/attendance-microservice/attendance-microservice/Dockerfile
           ls -ltra manifest/
           
     - name: Configure AWS credentials

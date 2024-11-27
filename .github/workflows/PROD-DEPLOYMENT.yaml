@@ -78,5 +78,5 @@ jobs:
         ls -ltra manifest/
         kubectl apply -f manifest/configmap.yaml
         kubectl apply -f manifest/attendance-service-updated.yaml
-        echo "kubectl apply exit code: $?"
+        sleep 10
         kubectl get configmap

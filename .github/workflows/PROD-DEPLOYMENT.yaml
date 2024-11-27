@@ -39,7 +39,9 @@ jobs:
         pwd
         ls -ltra
     - name: Creating Dockerfile
-      run: echo "${{ secrets.DOCKERFILE_PROD }}" > Dockerfile
+      env:
+       DOCKERFILE_FILE_CONTENT: ${{ secrets.DOCKERFILE_FILE_CONTENT }}
+      run: echo "$DOCKERFILE_FILE_CONTENT" > Dockerfile    
     - name: Show PWD and list content
       run: |
         echo "Current Working Directory: $(pwd)"
@@ -76,6 +78,9 @@ jobs:
         echo "Contents of manifest/attendance-service-updated.yaml:"
         cat manifest/attendance-service-updated.yaml
         ls -ltra manifest/
+        kubectl delete service attendancemanagement
+        kubectl delete deployment attendancemanagement
+        kubectl delete cm attendance-service-config
         kubectl apply -f manifest/configmap.yaml
         kubectl apply -f manifest/attendance-service-updated.yaml
         sleep 10

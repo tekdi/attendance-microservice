@@ -7,6 +7,7 @@ import {
   ApiBadRequestResponse,
   ApiInternalServerErrorResponse,
   ApiQuery,
+  ApiOperation,
 } from '@nestjs/swagger';
 import {
   Controller,
@@ -27,22 +28,26 @@ import { AttendanceDto, BulkAttendanceDTO } from './dto/attendance.dto';
 import { AttendanceSearchDto } from './dto/attendance-search.dto';
 import { Response } from 'express';
 import { AttendanceService } from './attendance.service';
-
+import { createAttendanceExamplesForSwagger, createBulkAttendanceExamplesForSwagger, searchAttendanceExamples } from './dto/attendance.examples';
 
 @ApiTags('Attendance')
 @Controller('attendance')
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(private readonly attendanceService: AttendanceService) { }
 
   @Post()
   @ApiCreatedResponse({
     description: 'Attendance has been created successfully.',
   })
-  @ApiBody({ type: AttendanceDto })
+  @ApiOperation({ summary: "Create Attendance" })
+  @ApiBody({ type: AttendanceDto, examples: createAttendanceExamplesForSwagger })
   @ApiHeader({
     name: 'tenantid',
   })
-  @ApiQuery({ name: 'userId', required: true, type: 'string' })
+  @ApiQuery({
+    name: 'userId', required: true, type: 'string', description: 'userId required',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @UsePipes(ValidationPipe)
   public async createAttendance(
     @Headers() headers,
@@ -74,12 +79,14 @@ export class AttendanceController {
   @ApiOkResponse({ description: 'Attendance List' })
   @ApiBadRequestResponse({ description: 'Bad Request' })
   @ApiInternalServerErrorResponse({ description: 'Internal Server Error' })
-  @ApiBody({ type: AttendanceSearchDto })
+  @ApiOperation({ summary: "Attendance Search" })
+  @ApiBody({ type: AttendanceSearchDto, examples: searchAttendanceExamples })
   // @UseInterceptors(ClassSerializerInterceptor)
   @UsePipes(ValidationPipe)
   @SerializeOptions({
     strategy: 'excludeAll',
   })
+  @ApiOperation({ summary: "Search Attendance" })
   @ApiHeader({
     name: 'tenantid',
   })
@@ -111,11 +118,15 @@ export class AttendanceController {
   @ApiBadRequestResponse({ description: 'Bad Request' })
   @ApiOkResponse({ description: 'Attendance updated successfully' })
   @ApiInternalServerErrorResponse({ description: 'Internal server error' })
-  @ApiBody({ type: BulkAttendanceDTO })
+  @ApiBody({ type: BulkAttendanceDTO, examples: createBulkAttendanceExamplesForSwagger })
+  @ApiOperation({ summary: "Create Bulk Attendance" })
   @ApiHeader({
     name: 'tenantid',
   })
-  @ApiQuery({ name: 'userId', required: true, type: 'string' })
+  @ApiQuery({
+    name: 'userId', required: true, type: 'string', description: 'userId required',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @UsePipes(ValidationPipe)
   public async multipleAttendance(
     @Headers() headers,
@@ -134,7 +145,7 @@ export class AttendanceController {
     attendanceDtos.scope = 'student'; // Set default value to 'student'
     const result = await this.attendanceService.multipleAttendance(
       tenantId,
-      userId , // Pass userId from query param
+      userId, // Pass userId from query param
       attendanceDtos,
       response,
     );

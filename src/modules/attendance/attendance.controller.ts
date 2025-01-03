@@ -86,7 +86,6 @@ export class AttendanceController {
   @SerializeOptions({
     strategy: 'excludeAll',
   })
-  @ApiOperation({ summary: "Search Attendance" })
   @ApiHeader({
     name: 'tenantid',
   })

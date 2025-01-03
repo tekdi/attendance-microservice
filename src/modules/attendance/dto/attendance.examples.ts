@@ -80,6 +80,12 @@ const createBulkAttendanceDto: Record<string, {
 
 export const createBulkAttendanceExamplesForSwagger = getExamples(createBulkAttendanceDto)
 
+/**
+* @description Search attendance example with the following rules:
+* - All fields are optional
+* - When facets are provided, sort key must be either 'present_percentage' or 'absent_percentage'
+* - Date format should follow ISO 8601
+*/
 const searchAttendanceDto: Record<string, {
     limit: number,
     page: number,
@@ -98,7 +104,7 @@ const searchAttendanceDto: Record<string, {
             scope: "student",
             context: "cohort"
         },
-        facets: ["contextId"], // if facets are provided ,Sort Key for has to be present_percentage or absent_percentage
+        facets: ["contextId"],
         sort: ["absent_percentage", "asc"]
     }
 }

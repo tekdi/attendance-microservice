@@ -33,8 +33,8 @@ export class AttendanceEntity {
   @Column({ nullable: true })
   image: string;
 
-  @Column({ nullable: true })
-  metaData: string;
+  @Column({ type: 'jsonb', nullable: true })
+  metaData: object;
 
   @Column({ nullable: true })
   syncTime: string;

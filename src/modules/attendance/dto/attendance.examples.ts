@@ -25,7 +25,7 @@ const createAttendanceDto: Record<string, {
     latitude: number;
     longitude: number;
     image: string;
-    metaData: string;
+    metaData: object;
     syncTime: string;
     session: string;
     context: string;
@@ -39,7 +39,7 @@ const createAttendanceDto: Record<string, {
         latitude: 0,
         longitude: 0,
         image: "",
-        metaData: "",
+        metaData: {},
         syncTime: "",
         session: "Morning",
         context: "event / cohort",
@@ -70,7 +70,7 @@ const createBulkAttendanceDto: Record<string, {
                 latitude: 0,
                 longitude: 0,
                 image: "string",
-                metaData: "string",
+                metaData: {},
                 syncTime: "string",
                 session: "string"
             }

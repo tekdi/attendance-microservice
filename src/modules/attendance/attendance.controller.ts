@@ -48,7 +48,7 @@ export class AttendanceController {
     name: 'userId', required: true, type: 'string', description: 'userId required',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @UsePipes(ValidationPipe)
+  @UsePipes(new ValidationPipe({ transform: true }),)
   public async createAttendance(
     @Headers() headers,
     @Body() attendanceDto: AttendanceDto,
@@ -127,7 +127,7 @@ export class AttendanceController {
     name: 'userId', required: true, type: 'string', description: 'userId required',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @UsePipes(ValidationPipe)
+  @UsePipes(new ValidationPipe({ transform: true }),)
   public async multipleAttendance(
     @Headers() headers,
     @Res() response: Response,

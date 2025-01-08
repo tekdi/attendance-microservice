@@ -1,9 +1,10 @@
 import { CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { IsDefined, IsEnum, IsUUID, Matches, Validate, ValidateIf, ValidateNested, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
+import { IsDefined, IsEnum, IsObject, IsOptional, IsUUID, Matches, Validate, ValidateIf, ValidateNested, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
 import { Expose, Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsNotEmpty } from 'class-validator';
 import { addHours, isBefore } from 'date-fns'; // Import isAfter function from date-fns
+import { IsValidDate } from 'src/common/utils/date.validator';
 
 //for student valid enum are[present,absent]
 //for teacher valid enum are[present,on-leave,half-day]
@@ -53,12 +54,12 @@ export class AttendanceDto {
     default: new Date()
   })
   @IsNotEmpty()
+  @IsValidDate({ message: 'The date provided is not a valid calendar date' })
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Please provide a valid date in the format yyyy-mm-dd' })
   @Validate(IsNotAfterToday, {
     message: 'Attendance date must not be after today',
   })
-  @Expose()
-  attendanceDate: Date;
+  attendanceDate: string;
 
   @ApiProperty({
     type: String,
@@ -86,9 +87,14 @@ export class AttendanceDto {
   @ApiPropertyOptional()
   image: string;
 
-  @ApiPropertyOptional()
-  @Expose()
-  metaData: string;
+  @ApiPropertyOptional({
+    type: Object,
+    description: 'Meta data',
+    example: '',
+  })
+  @IsObject()
+  @IsOptional()
+  metaData: any;
 
   @ApiPropertyOptional()
   @Expose()
@@ -175,14 +181,18 @@ export class UserAttendanceDTO {
   @ApiPropertyOptional()
   longitude: number;
 
-
   @Expose()
   @ApiPropertyOptional()
   image: string;
 
-  @ApiPropertyOptional()
-  @Expose()
-  metaData: string;
+  @ApiPropertyOptional({
+    type: Object,
+    description: 'Meta data',
+    example: '',
+  })
+  @IsObject()
+  @IsOptional()
+  metaData: any;
 
   @ApiPropertyOptional()
   @Expose()
@@ -191,8 +201,6 @@ export class UserAttendanceDTO {
   @ApiPropertyOptional()
   @Expose()
   session: string;
-
-
 }
 
 export class BulkAttendanceDTO {
@@ -201,12 +209,12 @@ export class BulkAttendanceDTO {
     description: "The date of the attendance in format yyyy-mm-dd",
   })
   @IsNotEmpty()
+  @IsValidDate({ message: 'The date provided is not a valid calendar date' })
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Please provide a valid date in the format yyyy-mm-dd' })
   @Validate(IsNotAfterToday, {
     message: 'Attendance date must not be after today',
   })
-  @Expose()
-  attendanceDate: Date;
+  attendanceDate: string;
 
   @IsUUID()
   @Expose()

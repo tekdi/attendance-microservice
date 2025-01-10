@@ -354,219 +354,7 @@ export class AttendanceService {
 
     return sortedTree;
   }
-  // async attendanceReport(attendanceStatsDto: AttendanceStatsDto) {
-  //   let { contextId, limit, offset, filters } = attendanceStatsDto;
-  //   try {
-  //     let nameFilter = '';
-  //     let userFilter = '';
-  //     let dateFilter = '';
-  //     let queryParams: any[] = [contextId];
-  //     let subqueryParams: any[] = [contextId]; // Initialize query parameters array
-  //     let paramIndex = 1; // Initialize parameter index
 
-  //     if (filters && filters.search) {
-  //       nameFilter = `AND u."name" ILIKE $${++paramIndex}`; // Increment paramIndex
-  //       queryParams.push(`%${filters.search.trim()}%`);
-  //       subqueryParams.push(`%${filters.search.trim()}%`);
-  //     }
-  //     if (filters && filters.userId) {
-  //       userFilter = ` AND u."userId" = $${++paramIndex}`; // Increment paramIndex
-  //       queryParams.push(filters.userId.trim());
-  //       subqueryParams.push(filters.userId.trim());
-  //     }
-  //     if (filters && filters.fromDate && filters.toDate) {
-  //       dateFilter = `WHERE aa."attendanceDate" >= $${++paramIndex} AND aa."attendanceDate" <= $${++paramIndex}`;
-  //       queryParams.push(filters.fromDate);
-  //       queryParams.push(filters.toDate);
-  //       subqueryParams.push(filters.fromDate);
-  //       subqueryParams.push(filters.toDate);
-  //     }
-
-  //     let query = `
-  //               SELECT
-  //                   u."userId",
-  //                   u."name",
-  //                   CASE
-  //                       WHEN aa_stats."total_attendance" = 0 THEN '-'
-  //                       ELSE ROUND((aa_stats."present_count" * 100.0) / aa_stats."total_attendance", 0)::text
-  //                   END AS attendance_percentage
-  //               FROM
-  //                   public."Users" AS u
-  //               INNER JOIN
-  //                   public."CohortMembers" AS cm ON cm."userId" = u."userId"
-  //               LEFT JOIN
-  //                   (
-  //                       SELECT
-  //                           aa."userId",
-  //                           COUNT(*) AS "total_attendance",
-  //                           COUNT(CASE WHEN aa."attendance" = 'present' THEN 1 END) AS "present_count"
-  //                       FROM
-  //                           public."Attendance" AS aa
-  //                       ${dateFilter}
-  //                       GROUP BY
-  //                           aa."userId"
-  //                   ) AS aa_stats ON cm."userId" = aa_stats."userId"
-  //               WHERE
-  //                   cm."cohortId" = $1
-  //                   AND cm."role" = 'student'
-  //                   ${nameFilter}
-  //                   ${userFilter}
-  //               GROUP BY
-  //                   u."userId", u."name", aa_stats."total_attendance", aa_stats."present_count"
-  //           `;
-
-  //     if (filters) {
-  //       if (
-  //         filters.nameOrder &&
-  //         (filters.nameOrder === 'asc' || filters.nameOrder === 'desc')
-  //       ) {
-  //         query += ` ORDER BY "name" ${filters.nameOrder}`;
-  //       } else if (
-  //         filters.percentageOrder &&
-  //         (filters.percentageOrder === 'asc' ||
-  //           filters.percentageOrder === 'desc')
-  //       ) {
-  //         query += ` ORDER BY attendance_percentage ${filters.percentageOrder}`;
-  //       }
-  //     }
-  //     query += `
-  //               LIMIT $${++paramIndex}
-  //               OFFSET $${++paramIndex}`;
-
-  //     queryParams.push(limit);
-  //     queryParams.push(offset);
-
-  //     const result = await this.attendanceRepository.query(query, queryParams);
-
-  //     if (!filters || !filters?.userId) {
-  //       // We don't need average for single user
-  //       const countquery = `
-  //                   SELECT ROUND(AVG(attendance_percentage::NUMERIC), 2) AS average_attendance_percentage
-  //                   FROM (
-  //                       SELECT
-  //                           u."userId",
-  //                           u."name",
-  //                           CASE
-  //                               WHEN aa_stats."total_attendance" = 0 THEN '-'
-  //                               ELSE ROUND((aa_stats."present_count" * 100.0) / aa_stats."total_attendance", 0)::text
-  //                           END AS attendance_percentage
-  //                       FROM
-  //                           public."Users" AS u
-  //                       INNER JOIN
-  //                           public."CohortMembers" AS cm ON cm."userId" = u."userId"
-  //                       LEFT JOIN
-  //                           (
-  //                               SELECT
-  //                                   aa."userId",
-  //                                   COUNT(*) AS "total_attendance",
-  //                                   COUNT(CASE WHEN aa."attendance" = 'present' THEN 1 END) AS "present_count"
-  //                               FROM
-  //                                   public."Attendance" AS aa
-  //                               ${dateFilter}
-  //                               GROUP BY
-  //                                   aa."userId"
-  //                           ) AS aa_stats ON cm."userId" = aa_stats."userId"
-  //                       WHERE
-  //                           cm."cohortId" = $1
-  //                           AND cm."role" = 'student'
-  //                           ${nameFilter}
-  //                           ${userFilter}
-  //                       GROUP BY
-  //                           u."userId", u."name", aa_stats."total_attendance", aa_stats."present_count"
-  //                   ) AS subquery`;
-
-  //       const average = await this.attendanceRepository.query(
-  //         countquery,
-  //         subqueryParams,
-  //       );
-  //       const report = await this.mapResponseforReport(result);
-  //       const response = {
-  //         report,
-  //         average: average[0],
-  //       };
-  //       return new SuccessResponse({
-  //         statusCode: HttpStatus.OK,
-  //         message: 'Ok.',
-  //         data: response,
-  //       });
-  //     } else {
-  //       const response = await this.mapResponseforReport(result);
-  //       return new SuccessResponse({
-  //         statusCode: HttpStatus.OK,
-  //         message: 'Ok.',
-  //         data: response,
-  //       });
-  //     }
-  //   } catch (error) {
-  //     return new ErrorResponseTypeOrm({
-  //       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-  //       errorMessage: error,
-  //     });
-  //   }
-  // }
-  // public async mappedResponse(result: any) {
-  //   const attendanceResponse = result.map((item: any) => {
-  //     const dateObject = new Date(item.attendanceDate);
-  //     const formattedDate = moment(dateObject).format('YYYY-MM-DD');
-  //     const attendanceMapping = {
-  //       tenantId: item?.tenantId ? `${item.tenantId}` : '',
-  //       attendanceId: item?.attendanceId ? `${item.attendanceId}` : '',
-  //       userId: item?.userId ? `${item.userId}` : '',
-  //       attendanceDate: item.attendanceDate ? formattedDate : null,
-  //       attendance: item?.attendance ? `${item.attendance}` : '',
-  //       remark: item?.remark ? `${item.remark}` : '',
-  //       latitude: item?.latitude ? item.latitude : 0,
-  //       longitude: item?.longitude ? item.longitude : 0,
-  //       image: item?.image ? `${item.image}` : '',
-  //       metaData: item?.metaData ? item.metaData : [],
-  //       syncTime: item?.syncTime ? `${item.syncTime}` : '',
-  //       session: item?.session ? `${item.session}` : '',
-  //       contextId: item?.contextId ? `${item.contextId}` : '',
-  //       contextType: item?.contextType ? `${item.contextType}` : '',
-  //       createdAt: item?.createdAt ? `${item.createdAt}` : '',
-  //       updatedAt: item?.updatedAt ? `${item.updatedAt}` : '',
-  //       createdBy: item?.createdBy ? `${item.createdBy}` : '',
-  //       updatedBy: item?.updatedBy ? `${item.updatedBy}` : '',
-  //       username: item?.username ? `${item.username}` : '',
-  //       role: item?.role ? `${item.role}` : '',
-  //     };
-
-  //     return new AttendanceDto(attendanceMapping);
-  //   });
-
-  //   return attendanceResponse;
-  // }
-
-  // public async mapResponseforReport(result: any) {
-  //   const attendanceReport = result.map((item: any) => {
-  //     const attendanceReportMapping = {
-  //       name: item?.name ? `${item.name}` : '',
-  //       userId: item?.userId ? `${item.userId}` : '',
-  //       attendance_percentage: item?.attendance_percentage
-  //         ? `${item.attendance_percentage}`
-  //         : '',
-  //     };
-
-  //     return new AttendanceStatsDto(attendanceReportMapping);
-  //   });return attendanceReport;
-  // }
-
-  // public async mapAttendanceRecord(result: any) {
-  //   const attendanceRecords = result.map((item: any) => {
-  //     const dateObject = new Date(item.attendanceDate);
-  //     const formattedDate = moment(dateObject).format('YYYY-MM-DD');
-
-  //     let attendance = {
-  //       name: item?.name ? `${item.name}` : '',
-  //       userId: item?.userId ? `${item.userId}` : '',
-  //       attendance: item?.attendance ? `${item.attendance}` : '',
-  //       attendanceDate: item.attendanceDate ? formattedDate : null,
-  //     };
-  //     return new AttendanceStatsDto(attendance);
-  //   });
-
-  //   return attendanceRecords;
-  // }
   /* 
     Method to create,update or add attendance for valid user in attendance table
     @body an object of details consisting of attendance details of user (attendance dto)  
@@ -672,64 +460,6 @@ export class AttendanceService {
     }
   }
 
-  /*Method to search attendance fromDate to toDate 
-    @body object containing attendance date details for user (AttendanceDateDto)
-    @return attendance records from fromDate to toDate     */
-
-  // public async attendanceByDate(
-  //   tenantId: string,
-  //   request: any,
-  //   attendanceSearchDto: AttendanceDateDto,
-  // ) {
-  //   try {
-  //     let { limit, page } = attendanceSearchDto;
-  //     if (!limit) {
-  //       limit = '0';
-  //     }
-
-  //     let offset = 0;
-  //     if (page > 1) {
-  //       offset = parseInt(limit) * (page - 1);
-  //     }
-
-  //     const fromDate = new Date(attendanceSearchDto.fromDate);
-  //     const toDate = new Date(attendanceSearchDto.toDate);
-
-  //     let whereClause: any = {
-  //       tenantId: tenantId ? tenantId : '',
-  //       attendanceDate: Between(fromDate, toDate),
-  //     };
-
-  //     // Add additional filters if present
-  //     if (attendanceSearchDto.filters) {
-  //       Object.keys(attendanceSearchDto.filters).forEach((key) => {
-  //         whereClause[key] = attendanceSearchDto.filters[key];
-  //       });
-  //     }
-
-  //     const [results, totalCount] =
-  //       await this.attendanceRepository.findAndCount({
-  //         where: whereClause,
-  //         take: parseInt(limit),
-  //         skip: offset,
-  //       });
-
-  //     const mappedResponse = await this.mappedResponse(results);
-
-  //     return new SuccessResponse({
-  //       statusCode: HttpStatus.OK,
-  //       message: 'Ok',
-  //       totalCount: totalCount,
-  //       data: mappedResponse,
-  //     });
-  //   } catch (e) {
-  //     return new ErrorResponseTypeOrm({
-  //       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-  //       errorMessage: e,
-  //     });
-  //   }
-  // }
-
   /*Method to add multiple attendance records in Attendance table
     @body Array of objects containing attendance details of user (AttendanceDto)
     */
@@ -749,6 +479,7 @@ export class AttendanceService {
       let count = 0;
 
       for (let attendance of attendanceData.userAttendance) {
+        console.log(attendance);
         const userAttendance = new AttendanceDto({
           attendanceDate: attendanceData.attendanceDate,
           contextId: attendanceData?.contextId,
@@ -781,6 +512,7 @@ export class AttendanceService {
           }
           count++;
         } catch (e) {
+          console.log(e);
           errors.push({ attendance, error: e.message });
         }
       }
@@ -827,6 +559,7 @@ export class AttendanceService {
         );
       }
     } catch (e) {
+      console.log(e);
       const errorMessage = e.message || 'Internal Server Error';
       this.loggerService.error(
         'Internal Server Error',

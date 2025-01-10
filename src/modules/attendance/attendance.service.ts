@@ -1,6 +1,5 @@
-import { InjectRepository } from '@nestjs/typeorm';
 import { AttendanceEntity } from './entities/attendance.entity';
-import { Repository, Between, In } from 'typeorm';
+import { Between, In } from 'typeorm';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AttendanceSearchDto } from './dto/attendance-search.dto';
 import { AttendanceDto, BulkAttendanceDTO } from './dto/attendance.dto';

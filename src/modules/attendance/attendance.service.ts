@@ -7,13 +7,13 @@ import { AttendanceDto, BulkAttendanceDTO } from './dto/attendance.dto';
 import APIResponse from 'src/common/utils/response';
 import { Response } from 'express';
 import { LoggerService } from 'src/common/logger/logger.service';
+import { TypeormService } from 'src/common/services/typeorm.service';
 
 @Injectable()
 export class AttendanceService {
   constructor(
-    @InjectRepository(AttendanceEntity)
-    private readonly attendanceRepository: Repository<AttendanceEntity>,
-    private readonly loggerService: LoggerService
+    private readonly loggerService: LoggerService,
+    private readonly typeormService: TypeormService,
   ) { }
 
   /*
@@ -43,7 +43,7 @@ export class AttendanceService {
 
       // Get column names from metadata
 
-      const attendanceKeys = this.attendanceRepository.metadata.columns.map(
+      const attendanceKeys = this.typeormService.getMetadata(AttendanceEntity).columns.map(
         (column) => column.propertyName,
       );
 
@@ -109,10 +109,10 @@ export class AttendanceService {
           }
         }
 
-        attendanceList = await this.attendanceRepository.find({
+        attendanceList = await this.typeormService.find(AttendanceEntity, {
           where: whereClause,
           order: orderOption, // Apply sorting option
-        });
+        })
         const paginatedAttendanceList = attendanceList.slice(
           offset,
           offset + limit,
@@ -133,7 +133,7 @@ export class AttendanceService {
       if (facets && facets.length > 0) {
         // absent_percentage and present_percentage is valid sort key when facets are provided
 
-        attendanceList = await this.attendanceRepository.find({
+        attendanceList = await this.typeormService.find(AttendanceEntity, {
           where: whereClause,
         });
 
@@ -217,13 +217,14 @@ export class AttendanceService {
   }
 
   async findAttendance(userId, contextId, date) {
-    let data = await this.attendanceRepository.findOne({
-      where: {
-        userId,
-        contextId,
-        attendanceDate: date,
-      },
-    });
+    let data = await this.typeormService.findOne(AttendanceEntity
+      , {
+        where: {
+          userId,
+          contextId,
+          attendanceDate: date,
+        },
+      });
     if (!data) {
       return null;
     }
@@ -430,20 +431,21 @@ export class AttendanceService {
   ) {
     try {
       attendanceDto.updatedBy = loginUserId;
-      let attendancefound = await this.findAttendance(
+      let attendanceFound = await this.findAttendance(
         attendanceDto.userId,
         attendanceDto.contextId,
         attendanceDto.attendanceDate,
       );
-      if (!attendancefound) {
+      if (!attendanceFound) {
         return false;
       }
-      let data = this.attendanceRepository.merge(
-        attendancefound,
+      let data = this.typeormService.merge(
+        AttendanceEntity,
+        attendanceFound,
         attendanceDto,
       );
       const updatedAttendanceRecord =
-        await this.attendanceRepository.save(data);
+        await this.typeormService.save(AttendanceEntity, data);
       return updatedAttendanceRecord;
     } catch (error) {
       return error;
@@ -452,8 +454,8 @@ export class AttendanceService {
 
   public async createAttendance(attendanceDto: AttendanceDto) {
     try {
-      const attendance = this.attendanceRepository.create(attendanceDto);
-      const result = await this.attendanceRepository.save(attendance);
+      const attendance = this.typeormService.create(AttendanceEntity, attendanceDto);
+      const result = await this.typeormService.save(AttendanceEntity, attendance);
       return result;
     } catch (error) {
       throw error;
@@ -479,7 +481,6 @@ export class AttendanceService {
       let count = 0;
 
       for (let attendance of attendanceData.userAttendance) {
-        console.log(attendance);
         const userAttendance = new AttendanceDto({
           attendanceDate: attendanceData.attendanceDate,
           contextId: attendanceData?.contextId,
@@ -512,7 +513,6 @@ export class AttendanceService {
           }
           count++;
         } catch (e) {
-          console.log(e);
           errors.push({ attendance, error: e.message });
         }
       }
@@ -559,7 +559,6 @@ export class AttendanceService {
         );
       }
     } catch (e) {
-      console.log(e);
       const errorMessage = e.message || 'Internal Server Error';
       this.loggerService.error(
         'Internal Server Error',

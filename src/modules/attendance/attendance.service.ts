@@ -111,7 +111,7 @@ export class AttendanceService {
         attendanceList = await this.typeormService.find(AttendanceEntity, {
           where: whereClause,
           order: orderOption, // Apply sorting option
-        })
+        });
         const paginatedAttendanceList = attendanceList.slice(
           offset,
           offset + limit,
@@ -119,7 +119,6 @@ export class AttendanceService {
         this.loggerService.log(
           'Attendance List Fetched Successfully',
           apiId,
-
         );
         return APIResponse.success(
           response,
@@ -216,7 +215,7 @@ export class AttendanceService {
   }
 
   async findAttendance(userId, contextId, date) {
-    let data = await this.typeormService.findOne(AttendanceEntity
+    const data = await this.typeormService.findOne(AttendanceEntity
       , {
         where: {
           userId,

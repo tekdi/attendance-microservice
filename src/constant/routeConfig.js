@@ -38,7 +38,7 @@
 			"packageName": "shiksha-attendance"
 		  }
 		]
-	  },
+	  }
 	]
   }
   

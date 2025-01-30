@@ -1,22 +1,25 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './common/database/database.module';
-// import { CacheModule } from '@nestjs/cache-manager';
-import { MemoryStore } from 'cache-manager-memory-store';
 import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from "@nestjs/typeorm";
 import { AttendanceModule } from './modules/attendance/attendance.module';
-// import { AssessmentTracking } from "src/modules/tracking_assesment/entities/tracking-assessment-entity";
+import { PermissionMiddleware } from './common/middleware/permission.middleware';
+import { RolePermissionModule } from './modules/permissionRbac/rolePermissionMapping/role-permission.module';
 
 @Module({
   imports: [
     AttendanceModule,
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
-    // CacheModule.register({ isGlobal: true, store: MemoryStore })
+    // CacheModule.register({ isGlobal: true, store: MemoryStore }),
+    RolePermissionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(PermissionMiddleware).forRoutes('*'); // Apply middleware to the all routes
+  }
+}

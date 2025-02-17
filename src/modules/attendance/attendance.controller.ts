@@ -6,8 +6,8 @@ import {
   ApiHeader,
   ApiBadRequestResponse,
   ApiInternalServerErrorResponse,
-  ApiQuery,
   ApiOperation,
+  ApiBasicAuth,
 } from '@nestjs/swagger';
 import {
   Controller,
@@ -29,9 +29,11 @@ import { AttendanceSearchDto } from './dto/attendance-search.dto';
 import { Response } from 'express';
 import { AttendanceService } from './attendance.service';
 import { createAttendanceExamplesForSwagger, createBulkAttendanceExamplesForSwagger, searchAttendanceExamples } from './dto/attendance.examples';
+import { GetUserId } from 'src/common/decorators/userId.decorator';
 
 @ApiTags('Attendance')
 @Controller('attendance')
+@ApiBasicAuth('access-token')
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) { }
 
@@ -44,16 +46,12 @@ export class AttendanceController {
   @ApiHeader({
     name: 'tenantid',
   })
-  @ApiQuery({
-    name: 'userId', required: true, type: 'string', description: 'userId required',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
   @UsePipes(new ValidationPipe({ transform: true }),)
   public async createAttendance(
     @Headers() headers,
     @Body() attendanceDto: AttendanceDto,
     @Res() response: Response,
-    @Query('userId') userId: string, // Now using userId from query
+    @GetUserId() userId: string,
     @UploadedFile() image,
   ) {
     if (!headers['tenantid']) {
@@ -94,6 +92,7 @@ export class AttendanceController {
     @Req() request: Request,
     @Body() studentSearchDto: AttendanceSearchDto,
     @Res() response: Response,
+    @GetUserId() userId: string,
   ) {
     let tenantid = headers['tenantid'];
     if (!tenantid) {
@@ -122,16 +121,13 @@ export class AttendanceController {
   @ApiHeader({
     name: 'tenantid',
   })
-  @ApiQuery({
-    name: 'userId', required: true, type: 'string', description: 'userId required',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
+
   @UsePipes(new ValidationPipe({ transform: true }),)
   public async multipleAttendance(
     @Headers() headers,
     @Res() response: Response,
     @Body() attendanceDtos: BulkAttendanceDTO,
-    @Query('userId') userId: string, // Now using userId from query
+    @GetUserId() userId: string,
   ) {
     const tenantId = headers['tenantid'];
     if (!tenantId) {

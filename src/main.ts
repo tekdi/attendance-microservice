@@ -7,7 +7,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
   const options = new DocumentBuilder()
     .setTitle('Attendance API Collection')
-    .setDescription('APIs of Attendacne Service')
+    .setDescription('APIs of Attendance Service')
     .setVersion('1.0')
     .addApiKey(
       { type: 'apiKey', name: 'Authorization', in: 'header' },

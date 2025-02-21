@@ -3,7 +3,7 @@ name: QA Attendance Service Deployment
 on:
   push:
     branches:
-      - main
+      - dev-release-1.0.0
 
 jobs:
   deploy_QA:

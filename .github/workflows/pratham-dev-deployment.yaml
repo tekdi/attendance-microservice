@@ -24,3 +24,5 @@ jobs:
         script: |
           cd ${{ secrets.TARGET_DIR_DEV }}
           ./deploy.sh
+
+  # Testing

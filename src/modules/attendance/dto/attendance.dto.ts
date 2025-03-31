@@ -16,7 +16,7 @@ enum Attendance {
 
 enum Scope {
   self = 'self',
-  student = 'student',
+  student = 'Learner',
 }
 
 @ValidatorConstraint({ name: 'isNotAfterToday', async: false })
@@ -143,7 +143,7 @@ export class AttendanceDto {
   updatedBy: string;
 
   @ApiPropertyOptional()
-  @ValidateIf(o => o.scope !== undefined && o.scope !== null) @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, student]" })
+  @ValidateIf(o => o.scope !== undefined && o.scope !== null) @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, Learner]" })
   scope: string
 
   constructor(obj: any) {
@@ -232,7 +232,7 @@ export class BulkAttendanceDTO {
 
   @ApiPropertyOptional()
   @ValidateIf(o => o.scope !== undefined && o.scope !== null)
-  @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, student]" })
+  @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, Learner]" })
   scope: string
 
   @ApiProperty({

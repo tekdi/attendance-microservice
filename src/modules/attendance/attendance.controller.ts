@@ -24,7 +24,7 @@ import {
   HttpStatus,
   Query,
 } from '@nestjs/common';
-import { AttendanceDto, BulkAttendanceDTO } from './dto/attendance.dto';
+import { AttendanceDto, BulkAttendanceDTO, Scope } from './dto/attendance.dto';
 import { AttendanceSearchDto } from './dto/attendance-search.dto';
 import { Response } from 'express';
 import { AttendanceService } from './attendance.service';
@@ -63,7 +63,7 @@ export class AttendanceController {
 
     attendanceDto.tenantId = headers['tenantid'];
     attendanceDto.image = image?.filename;
-    attendanceDto.scope = 'student'; // Set default value to 'student'
+    attendanceDto.scope = Scope.student; // Set default value to 'student'
 
     const result = await this.attendanceService.updateAttendanceRecord(
       userId, // Pass userId from query param
@@ -137,7 +137,7 @@ export class AttendanceController {
       });
     }
 
-    attendanceDtos.scope = 'student'; // Set default value to 'student'
+    attendanceDtos.scope = Scope.student; // Set default value to 'Learner'
     const result = await this.attendanceService.multipleAttendance(
       tenantId,
       userId, // Pass userId from query param

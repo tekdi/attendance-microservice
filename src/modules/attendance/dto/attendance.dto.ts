@@ -6,15 +6,15 @@ import { IsNotEmpty } from 'class-validator';
 import { addHours, isBefore } from 'date-fns'; // Import isAfter function from date-fns
 import { IsValidDate } from 'src/common/utils/date.validator';
 
-//for student valid enum are[present,absent]
-//for teacher valid enum are[present,on-leave,half-day]
+// for Learner valid enum are[present,absent]
+// for teacher valid enum are[present,on-leave,half-day]
 enum Attendance {
   present = "present",
   absent = "absent",
   onLeave = "on-leave"
 }
 
-enum Scope {
+export enum Scope {
   self = 'self',
   student = 'Learner',
 }

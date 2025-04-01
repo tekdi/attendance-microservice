@@ -3,7 +3,7 @@ import { AttendanceEntity } from './entities/attendance.entity';
 import { Repository, Between, In } from 'typeorm';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AttendanceSearchDto } from './dto/attendance-search.dto';
-import { AttendanceDto, BulkAttendanceDTO } from './dto/attendance.dto';
+import { AttendanceDto, BulkAttendanceDTO, Scope } from './dto/attendance.dto';
 import APIResponse from 'src/common/utils/response';
 import { Response } from 'express';
 import { LoggerService } from 'src/common/logger/logger.service';
@@ -599,7 +599,7 @@ export class AttendanceService {
         );
       } else {
         if (!attendanceDto.scope) {
-          attendanceDto.scope = 'student';
+          attendanceDto.scope = Scope.student;
         }
         attendanceDto.createdBy = loginUserId;
         attendanceDto.updatedBy = loginUserId;

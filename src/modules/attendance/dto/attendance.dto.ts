@@ -6,17 +6,17 @@ import { IsNotEmpty } from 'class-validator';
 import { addHours, isBefore } from 'date-fns'; // Import isAfter function from date-fns
 import { IsValidDate } from 'src/common/utils/date.validator';
 
-//for student valid enum are[present,absent]
-//for teacher valid enum are[present,on-leave,half-day]
+// for Learner valid enum are[present,absent]
+// for teacher valid enum are[present,on-leave,half-day]
 enum Attendance {
   present = "present",
   absent = "absent",
   onLeave = "on-leave"
 }
 
-enum Scope {
+export enum Scope {
   self = 'self',
-  student = 'student',
+  student = 'Learner',
 }
 
 @ValidatorConstraint({ name: 'isNotAfterToday', async: false })
@@ -143,7 +143,7 @@ export class AttendanceDto {
   updatedBy: string;
 
   @ApiPropertyOptional()
-  @ValidateIf(o => o.scope !== undefined && o.scope !== null) @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, student]" })
+  @ValidateIf(o => o.scope !== undefined && o.scope !== null) @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, Learner]" })
   scope: string
 
   constructor(obj: any) {
@@ -232,7 +232,7 @@ export class BulkAttendanceDTO {
 
   @ApiPropertyOptional()
   @ValidateIf(o => o.scope !== undefined && o.scope !== null)
-  @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, student]" })
+  @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, Learner]" })
   scope: string
 
   @ApiProperty({

@@ -23,6 +23,4 @@ jobs:
         port: ${{ secrets.PORT_DEV }}
         script: |
           cd ${{ secrets.TARGET_DIR_DEV }}
-          ./deploy.sh
-
-  # Testing
+          ./deloy.sh

@@ -11,7 +11,7 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private configService: ConfigService) {
     // Retrieve Kafka config from the configuration
-    this.isKafkaEnabled = this.configService.get<boolean>('kafkaEnabled', true); // Default to true if not specified
+    this.isKafkaEnabled = this.configService.get<boolean>('kafkaEnabled', false); // Default to true if not specified
     const brokers = this.configService.get<string>('KAFKA_BROKERS', 'localhost:9092').split(',');
     const clientId = this.configService.get<string>('KAFKA_CLIENT_ID', 'attendance-service');
 
@@ -108,25 +108,6 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
    * @param attendanceData - The attendance data to include in the event
    * @param attendanceId - The ID of the attendance (used as the message key)
    */
-  // async publishAttendanceEvent(eventType: 'created' | 'updated' | 'deleted', attendanceData: any, attendanceId: string): Promise<void> {
-  //   if (!this.isKafkaEnabled) {
-  //     this.logger.warn('Kafka is disabled. Skipping attendance event publish.');
-  //     return; // Do nothing if Kafka is disabled
-  //   }
-
-  //   const topic = this.configService.get<string>('KAFKA_TOPIC', 'attendance-topic');
-    
-  //   const payload = {
-  //     eventType,
-  //     timestamp: new Date().toISOString(),
-  //     attendanceId,
-  //     data: attendanceData
-  //   };
-
-  //   await this.publishMessage(topic, payload, attendanceId);
-  //   this.logger.log(`Attendance ${eventType} event published for attendance ${attendanceId}`);
-  // }
-
   async publishAttendanceEvent(eventType: 'created' | 'updated' | 'deleted', attendanceData: any, attendanceId: string): Promise<void> {
     if (!this.isKafkaEnabled) {
       this.logger.warn('Kafka is disabled. Skipping attendance event publish.');

@@ -1,11 +1,12 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Kafka, Producer } from 'kafkajs';
+import { Kafka, Producer, Admin } from 'kafkajs';
 
 @Injectable()
 export class KafkaService implements OnModuleInit, OnModuleDestroy {
   private readonly kafka: Kafka;
   private producer: Producer;
+  private admin: Admin;
   private readonly logger = new Logger(KafkaService.name);
   private isKafkaEnabled: boolean; // Flag to check if Kafka is enabled
 
@@ -27,25 +28,82 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
       });
 
       this.producer = this.kafka.producer();
+      this.admin = this.kafka.admin();
     }
   }
 
   async onModuleInit() {
     if (this.isKafkaEnabled) {
       try {
+        await this.connectAdmin();
+        await this.ensureTopicExists();
         await this.connectProducer();
-        this.logger.log('Kafka producer initialized successfully');
+        this.logger.log('Kafka producer and admin initialized successfully');
       } catch (error) {
-        this.logger.error('Failed to initialize Kafka producer', error);
+        this.logger.error('Failed to initialize Kafka producer or admin', error);
       }
     } else {
-      this.logger.log('Kafka is disabled. Skipping producer initialization.');
+      this.logger.log('Kafka is disabled. Skipping producer and admin initialization.');
     }
   }
 
   async onModuleDestroy() {
     if (this.isKafkaEnabled) {
       await this.disconnectProducer();
+      await this.disconnectAdmin();
+    }
+  }
+
+  private async connectAdmin() {
+    try {
+      await this.admin.connect();
+      this.logger.log('Kafka admin connected');
+    } catch (error) {
+      this.logger.error(`Failed to connect Kafka admin: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  private async disconnectAdmin() {
+    try {
+      await this.admin.disconnect();
+      this.logger.log('Kafka admin disconnected');
+    } catch (error) {
+      this.logger.error(`Failed to disconnect Kafka admin: ${error.message}`, error.stack);
+    }
+  }
+
+  private async ensureTopicExists() {
+    try {
+      const topicName = this.configService.get<string>('KAFKA_TOPIC', 'user-topic');
+      
+      // Check if topic exists
+      const existingTopics = await this.admin.listTopics();
+      
+      if (!existingTopics.includes(topicName)) {
+        // Create topic if it doesn't exist
+        await this.admin.createTopics({
+          topics: [
+            {
+              topic: topicName,
+              numPartitions: 3, // You can configure this
+              replicationFactor: 1, // You can configure this based on your cluster setup
+              configEntries: [
+                {
+                  name: 'cleanup.policy', 
+                  value: 'compact'
+                }
+              ]
+            }
+          ],
+        });
+        this.logger.log(`Topic '${topicName}' created successfully`);
+      } else {
+        this.logger.log(`Topic '${topicName}' already exists`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to ensure topic exists: ${error.message}`, error.stack);
+      throw error;
     }
   }
 
@@ -114,7 +172,7 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
       return; // Do nothing if Kafka is disabled
     }
   
-    const topic = this.configService.get<string>('KAFKA_TOPIC', 'attendance-topic');
+    const topic = this.configService.get<string>('KAFKA_TOPIC', 'user-topic');
     let fullEventType = '';
     switch (eventType) {
       case 'created':

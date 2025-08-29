@@ -29,8 +29,10 @@ jobs:
       with:
         node-version: 21.1.0
     - name: Decode and write .env file
+      env:
+        ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_PROD }}
       run: |
-        echo "${{ secrets.ENV_FILE_PROD }}" | base64 -d > manifest/configmap.yaml
+        echo "$ENV_FILE_CONTENT" > manifest/configmap.yaml
         echo "Contents of manifest/configmap.yaml:"
         cat manifest/configmap.yaml
     - name: Show PWD and list content

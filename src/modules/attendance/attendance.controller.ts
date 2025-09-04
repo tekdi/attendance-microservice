@@ -41,7 +41,7 @@ export class AttendanceController {
   @ApiCreatedResponse({
     description: 'Attendance has been created successfully.',
   })
-  @ApiOperation({ summary: "Create Attendance" })
+  @ApiOperation({ summary: "Create Attendance", description: "Creates or updates attendance record with Kafka event publishing" })
   @ApiBody({ type: AttendanceDto, examples: createAttendanceExamplesForSwagger })
   @ApiHeader({
     name: 'tenantid',
@@ -117,7 +117,7 @@ export class AttendanceController {
   @ApiOkResponse({ description: 'Attendance updated successfully' })
   @ApiInternalServerErrorResponse({ description: 'Internal server error' })
   @ApiBody({ type: BulkAttendanceDTO, examples: createBulkAttendanceExamplesForSwagger })
-  @ApiOperation({ summary: "Create Bulk Attendance" })
+  @ApiOperation({ summary: "Create Bulk Attendance", description: "Processes multiple attendance records with Kafka event publishing for each operation" })
   @ApiHeader({
     name: 'tenantid',
   })

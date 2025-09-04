@@ -571,8 +571,9 @@ export class AttendanceService {
   //   return attendanceRecords;
   // }
   /* 
-    Method to create,update or add attendance for valid user in attendance table
+    Method to create,update or add attendance for valid user in attendance table with Kafka event publishing
     @body an object of details consisting of attendance details of user (attendance dto)  
+    @publishes Kafka events on successful create/update operations
     @return updated details of attendance record 
     */
 
@@ -741,8 +742,9 @@ export class AttendanceService {
   //   }
   // }
 
-  /*Method to add multiple attendance records in Attendance table
+  /*Method to add multiple attendance records in Attendance table with Kafka event publishing
     @body Array of objects containing attendance details of user (AttendanceDto)
+    @publishes Kafka events for each created/updated attendance record
     */
 
   public async multipleAttendance(
@@ -787,8 +789,10 @@ export class AttendanceService {
           if (!attendanceRes) {
             let createAttendance = await this.createAttendance(userAttendance);
             results.push({ status: 'created', attendance: createAttendance });
+            this.publishAttendanceEvent('created', createAttendance.attendanceId, apiId);
           } else {
             results.push({ status: 'updated', attendance: attendanceRes });
+            this.publishAttendanceEvent('updated', attendanceRes.attendanceId, apiId);
           }
           count++;
         } catch (e) {

@@ -1,9 +1,11 @@
 import { CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import {
+  IsBoolean,
   IsDefined,
   IsEnum,
   IsObject,
   IsOptional,
+  IsString,
   IsUUID,
   Matches,
   Validate,
@@ -166,6 +168,22 @@ export class AttendanceDto {
     message: 'Please enter valid enum values for scope [self, Learner]',
   })
   scope: string;
+
+  @IsOptional()
+  @IsBoolean()
+  lateMark?: boolean;
+
+  @IsOptional()
+  @IsString()
+  absentReason?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  validLocation?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, any>;
 
   constructor(obj: any) {
     Object.assign(this, obj);

@@ -1,6 +1,12 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
-@Entity({name:"Attendance"})
+@Entity({ name: 'Attendance' })
 export class AttendanceEntity {
   @PrimaryGeneratedColumn('uuid')
   attendanceId: string;
@@ -49,10 +55,16 @@ export class AttendanceEntity {
   contextId: string;
 
   // @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  @CreateDateColumn({ type: "timestamp with time zone", default: () => "CURRENT_TIMESTAMP" })
+  @CreateDateColumn({
+    type: 'timestamp with time zone',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: "timestamp with time zone", default: () => "CURRENT_TIMESTAMP" })
+  @UpdateDateColumn({
+    type: 'timestamp with time zone',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   updatedAt: Date;
 
   @Column()
@@ -63,6 +75,24 @@ export class AttendanceEntity {
 
   @Column()
   scope: string;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+  })
+  lateMark: boolean;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  absentReason: string | null;
+
+  @Column({
+    type: 'boolean',
+    default: true,
+  })
+  validLocation: boolean;
 
   constructor(obj: Partial<AttendanceEntity>) {
     Object.assign(this, obj);

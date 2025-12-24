@@ -3,17 +3,20 @@ import { AttendanceEntity } from './entities/attendance.entity';
 import { Repository, Between, In } from 'typeorm';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AttendanceSearchDto } from './dto/attendance-search.dto';
-import { AttendanceDto, BulkAttendanceDTO } from './dto/attendance.dto';
+import { AttendanceDto, BulkAttendanceDTO, Scope } from './dto/attendance.dto';
 import APIResponse from 'src/common/utils/response';
 import { Response } from 'express';
 import { LoggerService } from 'src/common/logger/logger.service';
+import { KafkaService } from 'src/kafka/kafka.service';
 
 @Injectable()
 export class AttendanceService {
   constructor(
     @InjectRepository(AttendanceEntity)
     private readonly attendanceRepository: Repository<AttendanceEntity>,
-    private readonly loggerService: LoggerService
+    private readonly loggerService: LoggerService,
+    private readonly kafkaService: KafkaService,
+
   ) { }
 
   /*
@@ -568,8 +571,9 @@ export class AttendanceService {
   //   return attendanceRecords;
   // }
   /* 
-    Method to create,update or add attendance for valid user in attendance table
+    Method to create,update or add attendance for valid user in attendance table with Kafka event publishing
     @body an object of details consisting of attendance details of user (attendance dto)  
+    @publishes Kafka events on successful create/update operations
     @return updated details of attendance record 
     */
 
@@ -590,6 +594,7 @@ export class AttendanceService {
           apiId,
           loginUserId
         );
+        this.publishAttendanceEvent('updated', attendanceFound.attendanceId, apiId)
         return APIResponse.success(
           res,
           apiId,
@@ -599,7 +604,7 @@ export class AttendanceService {
         );
       } else {
         if (!attendanceDto.scope) {
-          attendanceDto.scope = 'student';
+          attendanceDto.scope = Scope.student;
         }
         attendanceDto.createdBy = loginUserId;
         attendanceDto.updatedBy = loginUserId;
@@ -609,6 +614,12 @@ export class AttendanceService {
           apiId,
           loginUserId
         );
+        this.publishAttendanceEvent('created', attendanceCreated.attendanceId, apiId)
+        // .catch(error => LoggerUtil.error(
+        //   `Failed to publish user updated event to Kafka`,
+        //   `Error: ${error.message}`,
+        //   apiId
+        // ));
         return APIResponse.success(
           res,
           apiId,
@@ -632,6 +643,7 @@ export class AttendanceService {
       );
     }
   }
+
 
   /*Method to update attendance for userId
     @return updated attendance record based on attendanceId
@@ -730,8 +742,9 @@ export class AttendanceService {
   //   }
   // }
 
-  /*Method to add multiple attendance records in Attendance table
+  /*Method to add multiple attendance records in Attendance table with Kafka event publishing
     @body Array of objects containing attendance details of user (AttendanceDto)
+    @publishes Kafka events for each created/updated attendance record
     */
 
   public async multipleAttendance(
@@ -776,8 +789,10 @@ export class AttendanceService {
           if (!attendanceRes) {
             let createAttendance = await this.createAttendance(userAttendance);
             results.push({ status: 'created', attendance: createAttendance });
+            this.publishAttendanceEvent('created', createAttendance.attendanceId, apiId);
           } else {
             results.push({ status: 'updated', attendance: attendanceRes });
+            this.publishAttendanceEvent('updated', attendanceRes.attendanceId, apiId);
           }
           count++;
         } catch (e) {
@@ -841,6 +856,45 @@ export class AttendanceService {
         errorMessage,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
+    }
+  }
+
+
+  private async publishAttendanceEvent(
+    eventType: 'created' | 'updated' | 'deleted',
+    attendanceId: string,
+    apiId: string
+  ): Promise<void> {
+    try {      
+      // For delete events, we may want to include just basic information since the attendance might already be removed
+      let attendanceData: any;
+      
+      if (eventType === 'deleted') {
+        attendanceData = {
+          attendanceId: attendanceId,
+          deletedAt: new Date().toISOString()
+        };
+      } else {
+        // For create and update, fetch complete data from DB
+        try {
+          // Get basic user information
+          attendanceData = await this.attendanceRepository.findOne({
+            where: { attendanceId: attendanceId },
+          });
+        } catch (error) {
+          attendanceData = { attendanceId };          
+        }
+      }
+
+      await this.kafkaService.publishAttendanceEvent(eventType, attendanceData, attendanceId);
+      // LoggerUtil.log(`attendance ${eventType} event published to Kafka for attendance ${attendanceId}`, apiId);
+    } catch (error) {
+      // LoggerUtil.error(
+      //   `Failed to publish user ${eventType} event to Kafka`,
+      //   `Error: ${error.message}`,
+      //   apiId
+      // );
+      // Don't throw the error to avoid affecting the main operation
     }
   }
 }

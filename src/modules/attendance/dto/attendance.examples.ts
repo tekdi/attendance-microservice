@@ -44,7 +44,7 @@ const createAttendanceDto: Record<string, {
         session: "Morning",
         context: "event / cohort",
         contextId: "dcb80783-0619-485f-b2a7-ec4df21e7a60",
-        scope: "self / student"
+        scope: "self / Learner"
     }
 }
 
@@ -61,7 +61,7 @@ const createBulkAttendanceDto: Record<string, {
         attendanceDate: "2024-12-09",
         contextId: "dcb80783-0619-485f-b2a7-ec4df21e7a60",
         context: "cohort / event",
-        scope: "self / student",
+        scope: "self / Learner",
         userAttendance: [
             {
                 userId: "2447aa0c-4111-4cb9-94d1-9898ef6975a1",

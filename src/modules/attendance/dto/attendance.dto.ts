@@ -1,20 +1,35 @@
 import { CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { IsDefined, IsEnum, IsObject, IsOptional, IsUUID, Matches, Validate, ValidateIf, ValidateNested, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
-import { Expose, Type } from "class-transformer";
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsBoolean,
+  IsDefined,
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  Validate,
+  ValidateIf,
+  ValidateNested,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+} from 'class-validator';
+import { Expose, Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty } from 'class-validator';
 import { addHours, isBefore } from 'date-fns'; // Import isAfter function from date-fns
 import { IsValidDate } from 'src/common/utils/date.validator';
 
-//for student valid enum are[present,absent]
-//for teacher valid enum are[present,on-leave,half-day]
+// for Learner valid enum are[present,absent]
+// for teacher valid enum are[present,on-leave,half-day]
 enum Attendance {
-  present = "present",
-  absent = "absent",
-  onLeave = "on-leave"
+  present = 'present',
+  absent = 'absent',
+  onLeave = 'on-leave',
 }
 
-enum Scope {
+export enum Scope {
   self = 'self',
   student = 'student',
 }
@@ -39,8 +54,8 @@ export class AttendanceDto {
 
   @ApiProperty({
     type: String,
-    description: "The userid of the attendance",
-    default: "",
+    description: 'The userid of the attendance',
+    default: '',
   })
   @IsDefined()
   @IsNotEmpty()
@@ -50,12 +65,14 @@ export class AttendanceDto {
 
   @ApiProperty({
     type: String,
-    description: "The date of the attendance in format yyyy-mm-dd",
-    default: new Date()
+    description: 'The date of the attendance in format yyyy-mm-dd',
+    default: new Date(),
   })
   @IsNotEmpty()
   @IsValidDate({ message: 'The date provided is not a valid calendar date' })
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Please provide a valid date in the format yyyy-mm-dd' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'Please provide a valid date in the format yyyy-mm-dd',
+  })
   @Validate(IsNotAfterToday, {
     message: 'Attendance date must not be after today',
   })
@@ -63,12 +80,15 @@ export class AttendanceDto {
 
   @ApiProperty({
     type: String,
-    description: "The attendance of the attendance",
-    default: "",
+    description: 'The attendance of the attendance',
+    default: '',
   })
   @Expose()
   @IsNotEmpty()
-  @IsEnum(Attendance, { message: "Please enter valid enum values for attendance [present, absent,on-leave]" })
+  @IsEnum(Attendance, {
+    message:
+      'Please enter valid enum values for attendance [present, absent,on-leave]',
+  })
   attendance: string;
 
   @Expose()
@@ -106,8 +126,8 @@ export class AttendanceDto {
 
   @ApiPropertyOptional({
     type: String,
-    description: "The context of the attendance",
-    default: "",
+    description: 'The context of the attendance',
+    default: '',
   })
   @Expose()
   @IsNotEmpty()
@@ -115,8 +135,8 @@ export class AttendanceDto {
 
   @ApiProperty({
     type: String,
-    description: "The contextId of the attendance",
-    default: "",
+    description: 'The contextId of the attendance',
+    default: '',
   })
   @IsNotEmpty()
   @IsUUID()
@@ -143,14 +163,32 @@ export class AttendanceDto {
   updatedBy: string;
 
   @ApiPropertyOptional()
-  @ValidateIf(o => o.scope !== undefined && o.scope !== null) @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, student]" })
-  scope: string
+  @ValidateIf((o) => o.scope !== undefined && o.scope !== null)
+  @IsEnum(Scope, {
+    message: 'Please enter valid enum values for scope [self, Learner]',
+  })
+  scope: string;
+
+  @IsOptional()
+  @IsBoolean()
+  lateMark?: boolean;
+
+  @IsOptional()
+  @IsString()
+  absentReason?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  validLocation?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, any>;
 
   constructor(obj: any) {
     Object.assign(this, obj);
   }
 }
-
 
 export class UserAttendanceDTO {
   @IsUUID()
@@ -161,12 +199,15 @@ export class UserAttendanceDTO {
 
   @ApiProperty({
     type: String,
-    description: "The attendance of the attendance",
-    default: "",
+    description: 'The attendance of the attendance',
+    default: '',
   })
   @Expose()
   @IsNotEmpty()
-  @IsEnum(Attendance, { message: "Please enter valid enum values for attendance [present, absent,on-leave, half-day]" })
+  @IsEnum(Attendance, {
+    message:
+      'Please enter valid enum values for attendance [present, absent,on-leave, half-day]',
+  })
   attendance: string;
 
   @Expose()
@@ -206,11 +247,13 @@ export class UserAttendanceDTO {
 export class BulkAttendanceDTO {
   @ApiProperty({
     type: String,
-    description: "The date of the attendance in format yyyy-mm-dd",
+    description: 'The date of the attendance in format yyyy-mm-dd',
   })
   @IsNotEmpty()
   @IsValidDate({ message: 'The date provided is not a valid calendar date' })
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Please provide a valid date in the format yyyy-mm-dd' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'Please provide a valid date in the format yyyy-mm-dd',
+  })
   @Validate(IsNotAfterToday, {
     message: 'Attendance date must not be after today',
   })
@@ -224,16 +267,18 @@ export class BulkAttendanceDTO {
 
   @ApiProperty({
     type: String,
-    description: "The context of the attendance",
+    description: 'The context of the attendance',
   })
   @IsNotEmpty()
   @Expose()
   context: string;
 
   @ApiPropertyOptional()
-  @ValidateIf(o => o.scope !== undefined && o.scope !== null)
-  @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, student]" })
-  scope: string
+  @ValidateIf((o) => o.scope !== undefined && o.scope !== null)
+  @IsEnum(Scope, {
+    message: 'Please enter valid enum values for scope [self, Learner]',
+  })
+  scope: string;
 
   @ApiProperty({
     type: [UserAttendanceDTO], // Specify the type of userAttendance as an array of UserAttendanceDTO

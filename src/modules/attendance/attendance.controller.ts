@@ -23,17 +23,20 @@ import {
   Res,
   HttpStatus,
   Query,
+  Delete,
 } from '@nestjs/common';
 import { AttendanceDto, BulkAttendanceDTO, Scope } from './dto/attendance.dto';
 import { AttendanceSearchDto } from './dto/attendance-search.dto';
 import { Response } from 'express';
 import { AttendanceService } from './attendance.service';
 import {
+  bulkDeleteAttendanceExamplesForSwagger,
   createAttendanceExamplesForSwagger,
   createBulkAttendanceExamplesForSwagger,
   searchAttendanceExamples,
 } from './dto/attendance.examples';
 import { GetUserId } from 'src/common/decorators/userId.decorator';
+import { BulkDeleteAttendanceDTO } from './dto/bulk-delete-attendance.dto';
 
 @ApiTags('Attendance')
 @Controller('attendance')
@@ -163,4 +166,36 @@ export class AttendanceController {
     );
     return result;
   }
+
+  @Delete('bulkDelete')
+  @ApiOkResponse({ description: 'Attendance records deleted successfully' })
+  @ApiBadRequestResponse({ description: 'Bad Request' })
+  @ApiInternalServerErrorResponse({ description: 'Internal Server Error' })
+  @ApiOperation({ summary: "Bulk Delete Attendance Records" })
+  @ApiBody({ type: BulkDeleteAttendanceDTO, examples: bulkDeleteAttendanceExamplesForSwagger })
+  @ApiHeader({
+    name: 'tenantid',
+  })
+  public async bulkDeleteAttendance(
+    @Headers() headers,
+    @Body() bulkDeleteDto: BulkDeleteAttendanceDTO,
+    @Res() response: Response,
+    @GetUserId() userId: string,
+  ) {
+    if (!headers['tenantid']) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        statusCode: HttpStatus.BAD_REQUEST,
+        errorMessage: 'tenantId is missing in headers',
+      });
+    }
+
+    const result = await this.attendanceService.bulkDeleteAttendance(
+      headers['tenantid'],
+      userId,
+      bulkDeleteDto,
+      response,
+    );
+    return result;
+  }
 }
+

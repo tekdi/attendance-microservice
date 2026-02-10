@@ -8,6 +8,7 @@ import APIResponse from 'src/common/utils/response';
 import { Response } from 'express';
 import { LoggerService } from 'src/common/logger/logger.service';
 import { KafkaService } from 'src/kafka/kafka.service';
+import { BulkDeleteAttendanceDTO } from './dto/bulk-delete-attendance.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -895,6 +896,252 @@ export class AttendanceService {
       //   apiId
       // );
       // Don't throw the error to avoid affecting the main operation
+    }
+  }
+
+  /*Method to validate individual attendance record for deletion
+    @return validation errors array or empty array if valid
+    */
+  private validateDeleteRecord(record: any, index: number): string[] {
+    const errors = [];
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+    // Validate userId
+    if (!record.userId || typeof record.userId !== 'string' || record.userId.trim() === '') {
+      errors.push(`attendanceRecords[${index}].userId: userId is required and must be a non-empty string`);
+    }
+
+    // Validate contextId
+    if (!record.contextId || typeof record.contextId !== 'string' || record.contextId.trim() === '') {
+      errors.push(`attendanceRecords[${index}].contextId: contextId is required and must be a non-empty string`);
+    }
+
+    // Validate date format
+    if (!record.date || typeof record.date !== 'string') {
+      errors.push(`attendanceRecords[${index}].date: date is required and must be a string`);
+    } else if (!dateRegex.test(record.date)) {
+      errors.push(`attendanceRecords[${index}].date: Please provide a valid date in the format yyyy-mm-dd`);
+    } else {
+      // Validate if it's a valid calendar date
+      const dateParts = record.date.split('-');
+      const year = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10);
+      const day = parseInt(dateParts[2], 10);
+      const dateObj = new Date(year, month - 1, day);
+      
+      if (
+        dateObj.getFullYear() !== year ||
+        dateObj.getMonth() !== month - 1 ||
+        dateObj.getDate() !== day
+      ) {
+        errors.push(`attendanceRecords[${index}].date: The date provided is not a valid calendar date`);
+      }
+    }
+
+    return errors;
+  }
+
+  /*Method to bulk delete attendance records
+    @body Array of objects containing userId, contextId, and date to delete
+    @return deletion summary with counts
+    */
+  public async bulkDeleteAttendance(
+    tenantId: string,
+    requestUserId: string,
+    bulkDeleteDto: BulkDeleteAttendanceDTO,
+    res: Response,
+  ) {
+    const apiId = 'api.delete.bulkDeleteAttendance';
+    const results = [];
+    const errors = [];
+    let count = 0;
+
+    try {
+      // Check if attendanceRecords array is provided and not empty
+      if (!bulkDeleteDto.attendanceRecords || bulkDeleteDto.attendanceRecords.length === 0) {
+        this.loggerService.error(
+          'BAD_REQUEST',
+          'At least one record must be provided for deletion',
+          apiId,
+          requestUserId
+        );
+        return APIResponse.error(
+          res,
+          apiId,
+          'BAD_REQUEST',
+          'At least one record must be provided for deletion',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Process each delete request
+      for (let index = 0; index < bulkDeleteDto.attendanceRecords.length; index++) {
+        const record = bulkDeleteDto.attendanceRecords[index];
+        
+        try {
+          // Validate the record
+          const validationErrors = this.validateDeleteRecord(record, index);
+          
+          if (validationErrors.length > 0) {
+            // Record has validation errors
+            errors.push({
+              record: {
+                userId: record.userId,
+                contextId: record.contextId,
+                date: record.date,
+              },
+              index: index,
+              error: validationErrors.join('; '),
+            });
+            continue;
+          }
+
+          // First, check if the attendance record exists using existing method
+          const attendanceFound = await this.findAttendance(
+            record.userId,
+            record.contextId,
+            new Date(record.date),
+          );
+
+          if (!attendanceFound) {
+            // Record not found
+            errors.push({
+              record: {
+                userId: record.userId,
+                contextId: record.contextId,
+                date: record.date,
+              },
+              index: index,
+              error: 'Attendance record not found',
+            });
+            continue;
+          }
+
+          // Check tenant isolation - ensure the found record belongs to the tenant
+          if (attendanceFound.tenantId !== tenantId) {
+            errors.push({
+              record: {
+                userId: record.userId,
+                contextId: record.contextId,
+                date: record.date,
+              },
+              index: index,
+              error: 'Attendance record not found', // Don't expose cross-tenant info
+            });
+            this.loggerService.warn(
+              `Attempted cross-tenant deletion blocked for user ${record.userId}`,
+              apiId
+            );
+            continue;
+          }
+
+          // Record exists and belongs to correct tenant, proceed with deletion
+          const deleteResult = await this.attendanceRepository.delete({
+            attendanceId: attendanceFound.attendanceId,
+          });
+
+          if (deleteResult.affected > 0) {
+            results.push({
+              status: 'deleted',
+              attendance: {
+                userId: record.userId,
+                contextId: record.contextId,
+                date: record.date,
+                attendanceId: attendanceFound.attendanceId,
+              },
+            });
+            count++;
+          } else {
+            errors.push({
+              record: {
+                userId: record.userId,
+                contextId: record.contextId,
+                date: record.date,
+              },
+              index: index,
+              error: 'Failed to delete attendance record',
+            });
+          }
+        } catch (e) {
+          this.loggerService.error(
+            'Error deleting individual record',
+            e.message,
+            apiId,
+            requestUserId
+          );
+          errors.push({
+            record: {
+              userId: record.userId,
+              contextId: record.contextId,
+              date: record.date,
+            },
+            index: index,
+            error: e.message,
+          });
+        }
+      }
+
+      // Return response based on results (matching bulkAttendance pattern)
+      if (errors.length > 0) {
+        if (!results.length) {
+          // All records failed
+          this.loggerService.error(
+            'BAD_REQUEST',
+            `Attendance records cannot be deleted. Error: ${errors[0].error}`,
+            apiId,
+            requestUserId
+          );
+          return APIResponse.error(
+            res,
+            apiId,
+            'BAD_REQUEST',
+            `Attendance records cannot be deleted. Error: ${errors[0].error}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        // Partial success
+        this.loggerService.log(
+          `Bulk delete processed with some errors. Deleted: ${count}, Errors: ${errors.length}`,
+          apiId,
+          requestUserId
+        );
+        return APIResponse.success(
+          res,
+          apiId,
+          { totalCount: count, errors: errors, successfulDeletions: results },
+          HttpStatus.OK,
+          'Bulk Attendance Delete processed with some errors',
+        );
+      } else {
+        // All successful
+        this.loggerService.log(
+          `Bulk delete completed successfully. Deleted: ${count}`,
+          apiId,
+          requestUserId
+        );
+        return APIResponse.success(
+          res,
+          apiId,
+          { totalCount: count, deletedAttendance: results },
+          HttpStatus.OK,
+          'Bulk Attendance Deleted successfully',
+        );
+      }
+    } catch (e) {
+      const errorMessage = e.message || 'Internal Server Error';
+      this.loggerService.error(
+        'Internal Server Error',
+        e.message,
+        apiId,
+        requestUserId
+      );
+      return APIResponse.error(
+        res,
+        apiId,
+        'Internal Server Error',
+        errorMessage,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

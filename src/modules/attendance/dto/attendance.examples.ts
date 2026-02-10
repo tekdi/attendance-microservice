@@ -1,5 +1,6 @@
 import { AttendanceFiltersDto } from "./attendance-search.dto";
 import { UserAttendanceDTO } from "./attendance.dto";
+import { DeleteAttendanceRecordDTO } from "./bulk-delete-attendance.dto";
 
 
 const getExamples = (obj) => {
@@ -110,3 +111,38 @@ const searchAttendanceDto: Record<string, {
 }
 
 export const searchAttendanceExamples = getExamples(searchAttendanceDto);
+
+const bulkDeleteAttendanceDto: Record<string, {
+    attendanceRecords: DeleteAttendanceRecordDTO[]
+}> = {
+    SingleDelete: {
+        attendanceRecords: [
+            {
+                userId: "2447aa0c-4111-4cb9-94d1-9898ef6975a1",
+                contextId: "dcb80783-0619-485f-b2a7-ec4df21e7a60",
+                date: "2024-12-09"
+            }
+        ]
+    },
+    BulkDelete: {
+        attendanceRecords: [
+            {
+                userId: "2447aa0c-4111-4cb9-94d1-9898ef6975a1",
+                contextId: "dcb80783-0619-485f-b2a7-ec4df21e7a60",
+                date: "2024-12-09"
+            },
+            {
+                userId: "3558bb1d-5222-5dc0-a5e2-af5eg22f6b7c",
+                contextId: "dcb80783-0619-485f-b2a7-ec4df21e7a60",
+                date: "2024-12-10"
+            },
+            {
+                userId: "4669cc2e-6333-6ed1-b6f3-bg6fh33g7c8d",
+                contextId: "edc91894-1720-596g-c3b8-fd5eg32f8b7d",
+                date: "2024-12-11"
+            }
+        ]
+    }
+}
+
+export const bulkDeleteAttendanceExamplesForSwagger = getExamples(bulkDeleteAttendanceDto);

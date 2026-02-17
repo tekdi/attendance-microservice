@@ -941,9 +941,10 @@ export class AttendanceService {
     return errors;
   }
 
-  /*Method to bulk delete attendance records
+  /*Method to bulk delete attendance records (OPTIMIZED)
     @body Array of objects containing userId, contextId, and date to delete
     @return deletion summary with counts
+    @optimization Uses batch queries to find and delete records efficiently
     */
   public async bulkDeleteAttendance(
     tenantId: string,
@@ -974,110 +975,203 @@ export class AttendanceService {
         );
       }
 
-      // Process each delete request
+      // Validate all records first and flatten contextIds array into individual records
+      const validRecords = [];
       for (let index = 0; index < bulkDeleteDto.attendanceRecords.length; index++) {
         const record = bulkDeleteDto.attendanceRecords[index];
         
-        try {
-          // Validate the record
-          const validationErrors = this.validateDeleteRecord(record, index);
+        // Ensure either contextId or contextIds is provided
+        if (!record.contextId && (!record.contextIds || record.contextIds.length === 0)) {
+          errors.push({
+            record: {
+              userId: record.userId,
+              contextId: record.contextId || 'missing',
+              date: record.date,
+            },
+            index: index,
+            error: 'Either contextId or contextIds must be provided',
+          });
+          continue;
+        }
+
+        // If both are provided, return error
+        if (record.contextId && record.contextIds && record.contextIds.length > 0) {
+          errors.push({
+            record: {
+              userId: record.userId,
+              contextId: 'ambiguous',
+              date: record.date,
+            },
+            index: index,
+            error: 'Cannot provide both contextId and contextIds. Use one or the other.',
+          });
+          continue;
+        }
+
+        // Handle contextIds array - flatten into individual records
+        const contextIdsToProcess = record.contextIds && record.contextIds.length > 0 
+          ? record.contextIds 
+          : [record.contextId];
+
+        for (const contextId of contextIdsToProcess) {
+          const flattenedRecord = {
+            userId: record.userId,
+            contextId: contextId,
+            date: record.date,
+            index: index,
+          };
+
+          const validationErrors = this.validateDeleteRecord(flattenedRecord, index);
           
           if (validationErrors.length > 0) {
-            // Record has validation errors
             errors.push({
               record: {
                 userId: record.userId,
-                contextId: record.contextId,
+                contextId: contextId,
                 date: record.date,
               },
               index: index,
               error: validationErrors.join('; '),
             });
-            continue;
-          }
-
-          // First, check if the attendance record exists using existing method
-          const attendanceFound = await this.findAttendance(
-            record.userId,
-            record.contextId,
-            new Date(record.date),
-          );
-
-          if (!attendanceFound) {
-            // Record not found
-            errors.push({
-              record: {
-                userId: record.userId,
-                contextId: record.contextId,
-                date: record.date,
-              },
-              index: index,
-              error: 'Attendance record not found',
-            });
-            continue;
-          }
-
-          // Check tenant isolation - ensure the found record belongs to the tenant
-          if (attendanceFound.tenantId !== tenantId) {
-            errors.push({
-              record: {
-                userId: record.userId,
-                contextId: record.contextId,
-                date: record.date,
-              },
-              index: index,
-              error: 'Attendance record not found', // Don't expose cross-tenant info
-            });
-            this.loggerService.warn(
-              `Attempted cross-tenant deletion blocked for user ${record.userId}`,
-              apiId
-            );
-            continue;
-          }
-
-          // Record exists and belongs to correct tenant, proceed with deletion
-          const deleteResult = await this.attendanceRepository.delete({
-            attendanceId: attendanceFound.attendanceId,
-          });
-
-          if (deleteResult.affected > 0) {
-            results.push({
-              status: 'deleted',
-              attendance: {
-                userId: record.userId,
-                contextId: record.contextId,
-                date: record.date,
-                attendanceId: attendanceFound.attendanceId,
-              },
-            });
-            count++;
           } else {
-            errors.push({
-              record: {
-                userId: record.userId,
-                contextId: record.contextId,
-                date: record.date,
-              },
-              index: index,
-              error: 'Failed to delete attendance record',
-            });
+            validRecords.push(flattenedRecord);
           }
-        } catch (e) {
-          this.loggerService.error(
-            'Error deleting individual record',
-            e.message,
-            apiId,
-            requestUserId
-          );
+        }
+      }
+
+      // If no valid records, return error
+      if (validRecords.length === 0) {
+        this.loggerService.error(
+          'BAD_REQUEST',
+          'No valid records provided for deletion',
+          apiId,
+          requestUserId
+        );
+        return APIResponse.error(
+          res,
+          apiId,
+          'BAD_REQUEST',
+          'No valid records provided for deletion',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // OPTIMIZATION: Batch fetch all attendance records in a single query
+      // Extract unique values to optimize the IN clause
+      const userIds = [...new Set(validRecords.map(r => r.userId))];
+      const contextIds = [...new Set(validRecords.map(r => r.contextId))];
+      const dates = [...new Set(validRecords.map(r => new Date(r.date)))];
+
+      // Find all matching attendance records for this tenant using TypeORM In operator
+      const attendanceRecords = await this.attendanceRepository.find({
+        where: {
+          tenantId: tenantId,
+          userId: In(userIds),
+          contextId: In(contextIds),
+          attendanceDate: In(dates),
+        },
+      });
+
+      // Create a lookup map for faster matching (O(1) instead of O(n))
+      const attendanceMap = new Map();
+      attendanceRecords.forEach(attendance => {
+        // Handle both Date objects and string dates from database
+        let dateStr: string;
+        if (attendance.attendanceDate instanceof Date) {
+          dateStr = attendance.attendanceDate.toISOString().split('T')[0];
+        } else if (typeof attendance.attendanceDate === 'string') {
+          // PostgreSQL DATE type returns string in format YYYY-MM-DD
+          dateStr = attendance.attendanceDate;
+        } else {
+          // Fallback: try to convert to string
+          dateStr = String(attendance.attendanceDate).split('T')[0];
+        }
+        
+        const key = `${attendance.userId}_${attendance.contextId}_${dateStr}`;
+        attendanceMap.set(key, attendance);
+      });
+
+      // Match valid records with found attendance records
+      const recordsToDelete = [];
+      for (const record of validRecords) {
+        const key = `${record.userId}_${record.contextId}_${record.date}`;
+        const attendanceFound = attendanceMap.get(key);
+
+        if (!attendanceFound) {
           errors.push({
             record: {
               userId: record.userId,
               contextId: record.contextId,
               date: record.date,
             },
-            index: index,
-            error: e.message,
+            index: record.index,
+            error: 'Attendance record not found',
           });
+        } else {
+          recordsToDelete.push({
+            attendanceId: attendanceFound.attendanceId,
+            userId: record.userId,
+            contextId: record.contextId,
+            date: record.date,
+            index: record.index,
+          });
+        }
+      }
+
+      // OPTIMIZATION: Batch delete all records in a single query
+      if (recordsToDelete.length > 0) {
+        const attendanceIds = recordsToDelete.map(r => r.attendanceId);
+        
+        try {
+          const deleteResult = await this.attendanceRepository.delete({
+            attendanceId: In(attendanceIds),
+          });
+
+          if (deleteResult.affected > 0) {
+            count = deleteResult.affected;
+            
+            // Publish Kafka events for each deleted record (async, non-blocking)
+            for (const record of recordsToDelete) {
+              results.push({
+                status: 'deleted',
+                attendance: {
+                  userId: record.userId,
+                  contextId: record.contextId,
+                  date: record.date,
+                  attendanceId: record.attendanceId,
+                },
+              });
+              
+              // Publish deletion event to Kafka (fire and forget)
+              this.publishAttendanceEvent('deleted', record.attendanceId, apiId)
+                .catch(error => {
+                  this.loggerService.warn(
+                    `Failed to publish delete event for attendance ${record.attendanceId}: ${error.message}`,
+                    apiId
+                  );
+                });
+            }
+          }
+        } catch (deleteError) {
+          this.loggerService.error(
+            'Error during batch deletion',
+            deleteError.message,
+            apiId,
+            requestUserId
+          );
+          
+          // If batch delete fails, add all records to errors
+          for (const record of recordsToDelete) {
+            errors.push({
+              record: {
+                userId: record.userId,
+                contextId: record.contextId,
+                date: record.date,
+              },
+              index: record.index,
+              error: deleteError.message,
+            });
+          }
         }
       }
 

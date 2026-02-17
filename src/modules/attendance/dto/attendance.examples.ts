@@ -124,6 +124,53 @@ const bulkDeleteAttendanceDto: Record<string, {
             }
         ]
     },
+    MultipleContextsWithArray: {
+        attendanceRecords: [
+            {
+                userId: "2447aa0c-4111-4cb9-94d1-9898ef6975a1",
+                contextIds: [
+                    "dcb80783-0619-485f-b2a7-ec4df21e7a60",
+                    "edc91894-1720-596g-c3b8-fd5eg32f8b7d",
+                    "fea02905-2831-6a7h-d4c9-ge6fh43g9c8e"
+                ],
+                date: "2024-12-09"
+            }
+        ]
+    },
+    MultipleUsersWithContextArrays: {
+        attendanceRecords: [
+            {
+                userId: "2447aa0c-4111-4cb9-94d1-9898ef6975a1",
+                contextIds: [
+                    "dcb80783-0619-485f-b2a7-ec4df21e7a60",
+                    "edc91894-1720-596g-c3b8-fd5eg32f8b7d"
+                ],
+                date: "2024-12-09"
+            },
+            {
+                userId: "3558bb1d-5222-5dc0-a5e2-af5eg22f6b7c",
+                contextIds: [
+                    "dcb80783-0619-485f-b2a7-ec4df21e7a60",
+                    "fea02905-2831-6a7h-d4c9-ge6fh43g9c8e"
+                ],
+                date: "2024-12-10"
+            }
+        ]
+    },
+    MixedFormat: {
+        attendanceRecords: [
+            {
+                userId: "2447aa0c-4111-4cb9-94d1-9898ef6975a1",
+                contextIds: ["dcb80783-0619-485f-b2a7-ec4df21e7a60", "edc91894-1720-596g-c3b8-fd5eg32f8b7d"],
+                date: "2024-12-09"
+            },
+            {
+                userId: "3558bb1d-5222-5dc0-a5e2-af5eg22f6b7c",
+                contextId: "dcb80783-0619-485f-b2a7-ec4df21e7a60",
+                date: "2024-12-10"
+            }
+        ]
+    },
     BulkDelete: {
         attendanceRecords: [
             {
@@ -140,6 +187,30 @@ const bulkDeleteAttendanceDto: Record<string, {
                 userId: "4669cc2e-6333-6ed1-b6f3-bg6fh33g7c8d",
                 contextId: "edc91894-1720-596g-c3b8-fd5eg32f8b7d",
                 date: "2024-12-11"
+            }
+        ]
+    },
+    BulkDeleteMultipleContexts: {
+        attendanceRecords: [
+            {
+                userId: "2447aa0c-4111-4cb9-94d1-9898ef6975a1",
+                contextId: "dcb80783-0619-485f-b2a7-ec4df21e7a60",
+                date: "2024-12-09"
+            },
+            {
+                userId: "2447aa0c-4111-4cb9-94d1-9898ef6975a1",
+                contextId: "edc91894-1720-596g-c3b8-fd5eg32f8b7d",
+                date: "2024-12-09"
+            },
+            {
+                userId: "3558bb1d-5222-5dc0-a5e2-af5eg22f6b7c",
+                contextId: "dcb80783-0619-485f-b2a7-ec4df21e7a60",
+                date: "2024-12-10"
+            },
+            {
+                userId: "3558bb1d-5222-5dc0-a5e2-af5eg22f6b7c",
+                contextId: "edc91894-1720-596g-c3b8-fd5eg32f8b7d",
+                date: "2024-12-10"
             }
         ]
     }

@@ -860,6 +860,342 @@ export class AttendanceService {
     }
   }
 
+  /*Method to add multiple attendance records with date-specific logic
+    - For today's date: uses standard bulkAttendance logic
+    - For past dates: applies cohort-event synchronization rules
+    @body Array of objects containing attendance details of user (BulkAttendanceDTO)
+    @publishes Kafka events for each created/updated attendance record
+    */
+  public async bulkAttendanceV2(
+    tenantId: string,
+    userId: string | null,
+    attendanceData: BulkAttendanceDTO,
+    res: Response,
+  ) {
+    const loginUserId = userId;
+    const apiId = 'api.post.bulkAttendanceV2';
+
+    try {
+      // Parse the attendance date from the payload
+      const attendanceDate = new Date(attendanceData.attendanceDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      attendanceDate.setHours(0, 0, 0, 0);
+
+      // Check if the date is today
+      const isToday = attendanceDate.getTime() === today.getTime();
+
+      if (isToday) {
+        // If date is today, use the standard bulkAttendance logic
+        this.loggerService.log(
+          'Date is today, using standard bulkAttendance logic',
+          apiId,
+          userId
+        );
+        return await this.multipleAttendance(tenantId, userId, attendanceData, res);
+      } else {
+        // For past dates, apply date-specific logic
+        this.loggerService.log(
+          'Date is in the past, applying cohort-event synchronization logic',
+          apiId,
+          userId
+        );
+        return await this.bulkAttendanceWithCohortEventSync(
+          tenantId,
+          loginUserId,
+          attendanceData,
+          res,
+          apiId
+        );
+      }
+    } catch (e) {
+      const errorMessage = e.message || 'Internal Server Error';
+      this.loggerService.error(
+        'Internal Server Error',
+        e.message,
+        apiId,
+        userId
+      );
+      return APIResponse.error(
+        res,
+        apiId,
+        'Internal Server Error',
+        errorMessage,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /*Helper method for handling past date attendance with cohort-event synchronization
+    - Cohort context: simply updates attendance
+    - Event context: updates event attendance, then syncs cohort attendance based on event statuses
+    - OPTIMIZED: Single batch query for cohort sync instead of N queries
+    */
+  private async bulkAttendanceWithCohortEventSync(
+    tenantId: string,
+    loginUserId: string | null,
+    attendanceData: BulkAttendanceDTO,
+    res: Response,
+    apiId: string
+  ) {
+    const results = [];
+    const errors = [];
+    const userIdsForSync = new Set<string>(); // Track unique user IDs needing cohort sync
+
+    try {
+      const context = attendanceData.context?.toLowerCase();
+      const isEventContext = context === 'event';
+
+      // STEP 1: Process all user attendance records
+      for (const attendance of attendanceData.userAttendance) {
+        const userAttendance = new AttendanceDto({
+          attendanceDate: attendanceData.attendanceDate,
+          contextId: attendanceData?.contextId,
+          context: attendanceData?.context,
+          scope: attendanceData?.scope,
+          attendance: attendance?.attendance,
+          userId: attendance?.userId,
+          tenantId: tenantId,
+          remark: attendance?.remark,
+          latitude: attendance?.latitude,
+          longitude: attendance?.longitude,
+          image: attendance?.image,
+          metaData: attendance?.metaData,
+          syncTime: attendance?.syncTime,
+          session: attendance?.session,
+          createdBy: loginUserId,
+          updatedBy: loginUserId,
+        });
+
+        try {
+          const attendanceRes = await this.updateAttendance(userAttendance, loginUserId);
+          
+          if (!attendanceRes) {
+            const createAttendance = await this.createAttendance(userAttendance);
+            results.push({ status: 'created', attendance: createAttendance });
+            this.publishAttendanceEvent('created', createAttendance.attendanceId, apiId);
+          } else {
+            results.push({ status: 'updated', attendance: attendanceRes });
+            this.publishAttendanceEvent('updated', attendanceRes.attendanceId, apiId);
+          }
+
+          // Track users for cohort sync if this is event context
+          if (isEventContext) {
+            userIdsForSync.add(attendance.userId);
+          }
+        } catch (e) {
+          errors.push({ attendance, error: e.message });
+        }
+      }
+
+      // STEP 2: Batch cohort sync for all users (single query instead of N queries)
+      if (isEventContext && userIdsForSync.size > 0) {
+        this.loggerService.log(
+          `Processing cohort attendance sync for ${userIdsForSync.size} users`,
+          apiId,
+          loginUserId
+        );
+
+        try {
+          await this.batchSyncCohortAttendanceFromEvents(
+            tenantId,
+            Array.from(userIdsForSync),
+            attendanceData.attendanceDate,
+            loginUserId,
+            apiId
+          );
+        } catch (syncError) {
+          this.loggerService.error(
+            'Error in batch cohort sync',
+            syncError.message,
+            apiId,
+            loginUserId
+          );
+          errors.push({
+            error: `Cohort sync failed for ${userIdsForSync.size} users: ${syncError.message}`,
+          });
+        }
+      }
+
+      // STEP 3: Return consolidated response
+      const totalCount = results.length;
+      
+      if (errors.length > 0 && totalCount === 0) {
+        this.loggerService.error(
+          'BAD_REQUEST',
+          `Attendance cannot be created or updated. Error: ${errors[0].error}`,
+          apiId,
+          loginUserId
+        );
+        return APIResponse.error(
+          res,
+          apiId,
+          'BAD_REQUEST',
+          `Attendance cannot be created or updated. Error: ${errors[0].error}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (errors.length > 0) {
+        this.loggerService.log(
+          `Attendance processed with ${errors.length} errors`,
+          apiId,
+          loginUserId
+        );
+        return APIResponse.success(
+          res,
+          apiId,
+          { count: totalCount, errors: errors, successresults: results },
+          HttpStatus.CREATED,
+          'Bulk Attendance Processed with some errors',
+        );
+      }
+
+      this.loggerService.log(
+        'Attendance processed successfully',
+        apiId,
+        loginUserId
+      );
+      return APIResponse.success(
+        res,
+        apiId,
+        { totalCount: totalCount, responses: results },
+        HttpStatus.CREATED,
+        'Bulk Attendance Updated successfully',
+      );
+    } catch (e) {
+      const errorMessage = e.message || 'Internal Server Error';
+      this.loggerService.error(
+        'Internal Server Error',
+        errorMessage,
+        apiId,
+        loginUserId
+      );
+      return APIResponse.error(
+        res,
+        apiId,
+        'Internal Server Error',
+        errorMessage,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /*OPTIMIZED: Batch sync cohort attendance for multiple users
+    - Single query to fetch all attendance records for all users
+    - Groups by user and determines cohort status
+    - Batch updates cohort attendance
+    - Reduces N queries to 1 query + 1 batch update
+    */
+  private async batchSyncCohortAttendanceFromEvents(
+    tenantId: string,
+    userIds: string[],
+    attendanceDate: string,
+    loginUserId: string | null,
+    apiId: string
+  ) {
+    if (!userIds || userIds.length === 0) {
+      return;
+    }
+
+    const date = new Date(attendanceDate);
+    
+    // OPTIMIZATION: Single query to fetch all attendance records for all users
+    const allAttendanceRecords = await this.attendanceRepository.find({
+      where: {
+        tenantId: tenantId,
+        userId: In(userIds),
+        attendanceDate: date,
+      },
+    });
+
+    if (!allAttendanceRecords || allAttendanceRecords.length === 0) {
+      this.loggerService.log(
+        `No attendance records found for ${userIds.length} users on ${attendanceDate}`,
+        apiId,
+        loginUserId
+      );
+      return;
+    }
+
+    // Group records by userId for efficient processing
+    const recordsByUser = new Map<string, { events: any[], cohorts: any[] }>();
+    
+    for (const record of allAttendanceRecords) {
+      if (!recordsByUser.has(record.userId)) {
+        recordsByUser.set(record.userId, { events: [], cohorts: [] });
+      }
+      
+      const userRecords = recordsByUser.get(record.userId);
+      const context = record.context?.toLowerCase();
+      
+      if (context === 'event') {
+        userRecords.events.push(record);
+      } else if (context === 'cohort') {
+        userRecords.cohorts.push(record);
+      }
+    }
+
+    // Batch process: Collect all cohort records that need updating
+    const cohortRecordsToUpdate = [];
+
+    for (const [userId, records] of recordsByUser) {
+      if (records.events.length === 0) {
+        continue; // No events to sync from
+      }
+
+      // Determine if any event has present attendance
+      const hasAnyPresent = records.events.some(
+        record => record.attendance?.toLowerCase() === 'present'
+      );
+
+      const cohortAttendanceStatus = hasAnyPresent ? 'present' : 'absent';
+
+      // Check each cohort record for this user
+      for (const cohortRecord of records.cohorts) {
+        if (cohortRecord.attendance !== cohortAttendanceStatus) {
+          cohortRecord.attendance = cohortAttendanceStatus;
+          cohortRecord.updatedBy = loginUserId;
+          cohortRecordsToUpdate.push(cohortRecord);
+        }
+      }
+    }
+
+    // OPTIMIZATION: Batch save all updates in one transaction
+    if (cohortRecordsToUpdate.length > 0) {
+      this.loggerService.log(
+        `Batch updating ${cohortRecordsToUpdate.length} cohort attendance records`,
+        apiId,
+        loginUserId
+      );
+
+      const updatedRecords = await this.attendanceRepository.save(cohortRecordsToUpdate);
+      
+      // Publish Kafka events for all updates (fire and forget)
+      for (const updatedRecord of updatedRecords) {
+        this.publishAttendanceEvent('updated', updatedRecord.attendanceId, apiId)
+          .catch(error => {
+            this.loggerService.warn(
+              `Failed to publish event for attendance ${updatedRecord.attendanceId}: ${error.message}`,
+              apiId
+            );
+          });
+      }
+
+      this.loggerService.log(
+        `Successfully synced cohort attendance for ${recordsByUser.size} users`,
+        apiId,
+        loginUserId
+      );
+    } else {
+      this.loggerService.log(
+        `No cohort attendance updates needed for ${recordsByUser.size} users`,
+        apiId,
+        loginUserId
+      );
+    }
+  }
+
 
   private async publishAttendanceEvent(
     eventType: 'created' | 'updated' | 'deleted',

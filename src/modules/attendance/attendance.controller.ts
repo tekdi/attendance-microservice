@@ -167,6 +167,50 @@ export class AttendanceController {
     return result;
   }
 
+  @Post('bulkAttendanceV2')
+  @ApiCreatedResponse({
+    description: 'Attendance has been created successfully.',
+  })
+  @ApiBadRequestResponse({ description: 'Bad Request' })
+  @ApiOkResponse({ description: 'Attendance updated successfully' })
+  @ApiInternalServerErrorResponse({ description: 'Internal server error' })
+  @ApiBody({
+    type: BulkAttendanceDTO,
+    examples: createBulkAttendanceExamplesForSwagger,
+  })
+  @ApiOperation({
+    summary: 'Create Bulk Attendance V2 with Date Logic',
+    description:
+      'Processes multiple attendance records with date-specific logic: For today, uses standard logic. For past dates, applies cohort-event synchronization rules.',
+  })
+  @ApiHeader({
+    name: 'tenantid',
+  })
+  @UsePipes(new ValidationPipe({ transform: true }))
+  public async bulkAttendanceV2(
+    @Headers() headers,
+    @Res() response: Response,
+    @Body() attendanceDtos: BulkAttendanceDTO,
+    @GetUserId() userId: string,
+  ) {
+    const tenantId = headers['tenantid'];
+    if (!tenantId) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        statusCode: HttpStatus.BAD_REQUEST,
+        errorMessage: 'tenantId is missing in headers',
+      });
+    }
+
+    attendanceDtos.scope = Scope.student; // Set default value to 'Learner'
+    const result = await this.attendanceService.bulkAttendanceV2(
+      tenantId,
+      userId, // Pass userId from query param
+      attendanceDtos,
+      response,
+    );
+    return result;
+  }
+
   @Delete('bulkDelete')
   @ApiOkResponse({ description: 'Attendance records deleted successfully' })
   @ApiBadRequestResponse({ description: 'Bad Request' })

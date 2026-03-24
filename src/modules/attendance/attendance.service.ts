@@ -8,6 +8,7 @@ import APIResponse from 'src/common/utils/response';
 import { Response } from 'express';
 import { LoggerService } from 'src/common/logger/logger.service';
 import { KafkaService } from 'src/kafka/kafka.service';
+import { BulkDeleteAttendanceDTO } from './dto/bulk-delete-attendance.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -859,6 +860,342 @@ export class AttendanceService {
     }
   }
 
+  /*Method to add multiple attendance records with date-specific logic
+    - For today's date: uses standard bulkAttendance logic
+    - For past dates: applies cohort-event synchronization rules
+    @body Array of objects containing attendance details of user (BulkAttendanceDTO)
+    @publishes Kafka events for each created/updated attendance record
+    */
+  public async bulkAttendanceV2(
+    tenantId: string,
+    userId: string | null,
+    attendanceData: BulkAttendanceDTO,
+    res: Response,
+  ) {
+    const loginUserId = userId;
+    const apiId = 'api.post.bulkAttendanceV2';
+
+    try {
+      // Parse the attendance date from the payload
+      const attendanceDate = new Date(attendanceData.attendanceDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      attendanceDate.setHours(0, 0, 0, 0);
+
+      // Check if the date is today
+      const isToday = attendanceDate.getTime() === today.getTime();
+
+      if (isToday) {
+        // If date is today, use the standard bulkAttendance logic
+        this.loggerService.log(
+          'Date is today, using standard bulkAttendance logic',
+          apiId,
+          userId
+        );
+        return await this.multipleAttendance(tenantId, userId, attendanceData, res);
+      } else {
+        // For past dates, apply date-specific logic
+        this.loggerService.log(
+          'Date is in the past, applying cohort-event synchronization logic',
+          apiId,
+          userId
+        );
+        return await this.bulkAttendanceWithCohortEventSync(
+          tenantId,
+          loginUserId,
+          attendanceData,
+          res,
+          apiId
+        );
+      }
+    } catch (e) {
+      const errorMessage = e.message || 'Internal Server Error';
+      this.loggerService.error(
+        'Internal Server Error',
+        e.message,
+        apiId,
+        userId
+      );
+      return APIResponse.error(
+        res,
+        apiId,
+        'Internal Server Error',
+        errorMessage,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /*Helper method for handling past date attendance with cohort-event synchronization
+    - Cohort context: simply updates attendance
+    - Event context: updates event attendance, then syncs cohort attendance based on event statuses
+    - OPTIMIZED: Single batch query for cohort sync instead of N queries
+    */
+  private async bulkAttendanceWithCohortEventSync(
+    tenantId: string,
+    loginUserId: string | null,
+    attendanceData: BulkAttendanceDTO,
+    res: Response,
+    apiId: string
+  ) {
+    const results = [];
+    const errors = [];
+    const userIdsForSync = new Set<string>(); // Track unique user IDs needing cohort sync
+
+    try {
+      const context = attendanceData.context?.toLowerCase();
+      const isEventContext = context === 'event';
+
+      // STEP 1: Process all user attendance records
+      for (const attendance of attendanceData.userAttendance) {
+        const userAttendance = new AttendanceDto({
+          attendanceDate: attendanceData.attendanceDate,
+          contextId: attendanceData?.contextId,
+          context: attendanceData?.context,
+          scope: attendanceData?.scope,
+          attendance: attendance?.attendance,
+          userId: attendance?.userId,
+          tenantId: tenantId,
+          remark: attendance?.remark,
+          latitude: attendance?.latitude,
+          longitude: attendance?.longitude,
+          image: attendance?.image,
+          metaData: attendance?.metaData,
+          syncTime: attendance?.syncTime,
+          session: attendance?.session,
+          createdBy: loginUserId,
+          updatedBy: loginUserId,
+        });
+
+        try {
+          const attendanceRes = await this.updateAttendance(userAttendance, loginUserId);
+          
+          if (!attendanceRes) {
+            const createAttendance = await this.createAttendance(userAttendance);
+            results.push({ status: 'created', attendance: createAttendance });
+            this.publishAttendanceEvent('created', createAttendance.attendanceId, apiId);
+          } else {
+            results.push({ status: 'updated', attendance: attendanceRes });
+            this.publishAttendanceEvent('updated', attendanceRes.attendanceId, apiId);
+          }
+
+          // Track users for cohort sync if this is event context
+          if (isEventContext) {
+            userIdsForSync.add(attendance.userId);
+          }
+        } catch (e) {
+          errors.push({ attendance, error: e.message });
+        }
+      }
+
+      // STEP 2: Batch cohort sync for all users (single query instead of N queries)
+      if (isEventContext && userIdsForSync.size > 0) {
+        this.loggerService.log(
+          `Processing cohort attendance sync for ${userIdsForSync.size} users`,
+          apiId,
+          loginUserId
+        );
+
+        try {
+          await this.batchSyncCohortAttendanceFromEvents(
+            tenantId,
+            Array.from(userIdsForSync),
+            attendanceData.attendanceDate,
+            loginUserId,
+            apiId
+          );
+        } catch (syncError) {
+          this.loggerService.error(
+            'Error in batch cohort sync',
+            syncError.message,
+            apiId,
+            loginUserId
+          );
+          errors.push({
+            error: `Cohort sync failed for ${userIdsForSync.size} users: ${syncError.message}`,
+          });
+        }
+      }
+
+      // STEP 3: Return consolidated response
+      const totalCount = results.length;
+      
+      if (errors.length > 0 && totalCount === 0) {
+        this.loggerService.error(
+          'BAD_REQUEST',
+          `Attendance cannot be created or updated. Error: ${errors[0].error}`,
+          apiId,
+          loginUserId
+        );
+        return APIResponse.error(
+          res,
+          apiId,
+          'BAD_REQUEST',
+          `Attendance cannot be created or updated. Error: ${errors[0].error}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (errors.length > 0) {
+        this.loggerService.log(
+          `Attendance processed with ${errors.length} errors`,
+          apiId,
+          loginUserId
+        );
+        return APIResponse.success(
+          res,
+          apiId,
+          { count: totalCount, errors: errors, successresults: results },
+          HttpStatus.CREATED,
+          'Bulk Attendance Processed with some errors',
+        );
+      }
+
+      this.loggerService.log(
+        'Attendance processed successfully',
+        apiId,
+        loginUserId
+      );
+      return APIResponse.success(
+        res,
+        apiId,
+        { totalCount: totalCount, responses: results },
+        HttpStatus.CREATED,
+        'Bulk Attendance Updated successfully',
+      );
+    } catch (e) {
+      const errorMessage = e.message || 'Internal Server Error';
+      this.loggerService.error(
+        'Internal Server Error',
+        errorMessage,
+        apiId,
+        loginUserId
+      );
+      return APIResponse.error(
+        res,
+        apiId,
+        'Internal Server Error',
+        errorMessage,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /*OPTIMIZED: Batch sync cohort attendance for multiple users
+    - Single query to fetch all attendance records for all users
+    - Groups by user and determines cohort status
+    - Batch updates cohort attendance
+    - Reduces N queries to 1 query + 1 batch update
+    */
+  private async batchSyncCohortAttendanceFromEvents(
+    tenantId: string,
+    userIds: string[],
+    attendanceDate: string,
+    loginUserId: string | null,
+    apiId: string
+  ) {
+    if (!userIds || userIds.length === 0) {
+      return;
+    }
+
+    const date = new Date(attendanceDate);
+    
+    // OPTIMIZATION: Single query to fetch all attendance records for all users
+    const allAttendanceRecords = await this.attendanceRepository.find({
+      where: {
+        tenantId: tenantId,
+        userId: In(userIds),
+        attendanceDate: date,
+      },
+    });
+
+    if (!allAttendanceRecords || allAttendanceRecords.length === 0) {
+      this.loggerService.log(
+        `No attendance records found for ${userIds.length} users on ${attendanceDate}`,
+        apiId,
+        loginUserId
+      );
+      return;
+    }
+
+    // Group records by userId for efficient processing
+    const recordsByUser = new Map<string, { events: any[], cohorts: any[] }>();
+    
+    for (const record of allAttendanceRecords) {
+      if (!recordsByUser.has(record.userId)) {
+        recordsByUser.set(record.userId, { events: [], cohorts: [] });
+      }
+      
+      const userRecords = recordsByUser.get(record.userId);
+      const context = record.context?.toLowerCase();
+      
+      if (context === 'event') {
+        userRecords.events.push(record);
+      } else if (context === 'cohort') {
+        userRecords.cohorts.push(record);
+      }
+    }
+
+    // Batch process: Collect all cohort records that need updating
+    const cohortRecordsToUpdate = [];
+
+    for (const [userId, records] of recordsByUser) {
+      if (records.events.length === 0) {
+        continue; // No events to sync from
+      }
+
+      // Determine if any event has present attendance
+      const hasAnyPresent = records.events.some(
+        record => record.attendance?.toLowerCase() === 'present'
+      );
+
+      const cohortAttendanceStatus = hasAnyPresent ? 'present' : 'absent';
+
+      // Check each cohort record for this user
+      for (const cohortRecord of records.cohorts) {
+        if (cohortRecord.attendance !== cohortAttendanceStatus) {
+          cohortRecord.attendance = cohortAttendanceStatus;
+          cohortRecord.updatedBy = loginUserId;
+          cohortRecordsToUpdate.push(cohortRecord);
+        }
+      }
+    }
+
+    // OPTIMIZATION: Batch save all updates in one transaction
+    if (cohortRecordsToUpdate.length > 0) {
+      this.loggerService.log(
+        `Batch updating ${cohortRecordsToUpdate.length} cohort attendance records`,
+        apiId,
+        loginUserId
+      );
+
+      const updatedRecords = await this.attendanceRepository.save(cohortRecordsToUpdate);
+      
+      // Publish Kafka events for all updates (fire and forget)
+      for (const updatedRecord of updatedRecords) {
+        this.publishAttendanceEvent('updated', updatedRecord.attendanceId, apiId)
+          .catch(error => {
+            this.loggerService.warn(
+              `Failed to publish event for attendance ${updatedRecord.attendanceId}: ${error.message}`,
+              apiId
+            );
+          });
+      }
+
+      this.loggerService.log(
+        `Successfully synced cohort attendance for ${recordsByUser.size} users`,
+        apiId,
+        loginUserId
+      );
+    } else {
+      this.loggerService.log(
+        `No cohort attendance updates needed for ${recordsByUser.size} users`,
+        apiId,
+        loginUserId
+      );
+    }
+  }
+
 
   private async publishAttendanceEvent(
     eventType: 'created' | 'updated' | 'deleted',
@@ -895,6 +1232,346 @@ export class AttendanceService {
       //   apiId
       // );
       // Don't throw the error to avoid affecting the main operation
+    }
+  }
+
+  /*Method to validate individual attendance record for deletion
+    @return validation errors array or empty array if valid
+    */
+  private validateDeleteRecord(record: any, index: number): string[] {
+    const errors = [];
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+    // Validate userId
+    if (!record.userId || typeof record.userId !== 'string' || record.userId.trim() === '') {
+      errors.push(`attendanceRecords[${index}].userId: userId is required and must be a non-empty string`);
+    }
+
+    // Validate contextId
+    if (!record.contextId || typeof record.contextId !== 'string' || record.contextId.trim() === '') {
+      errors.push(`attendanceRecords[${index}].contextId: contextId is required and must be a non-empty string`);
+    }
+
+    // Validate date format
+    if (!record.date || typeof record.date !== 'string') {
+      errors.push(`attendanceRecords[${index}].date: date is required and must be a string`);
+    } else if (!dateRegex.test(record.date)) {
+      errors.push(`attendanceRecords[${index}].date: Please provide a valid date in the format yyyy-mm-dd`);
+    } else {
+      // Validate if it's a valid calendar date
+      const dateParts = record.date.split('-');
+      const year = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10);
+      const day = parseInt(dateParts[2], 10);
+      const dateObj = new Date(year, month - 1, day);
+      
+      if (
+        dateObj.getFullYear() !== year ||
+        dateObj.getMonth() !== month - 1 ||
+        dateObj.getDate() !== day
+      ) {
+        errors.push(`attendanceRecords[${index}].date: The date provided is not a valid calendar date`);
+      }
+    }
+
+    return errors;
+  }
+
+  /*Method to bulk delete attendance records (OPTIMIZED)
+    @body Array of objects containing userId, contextId, and date to delete
+    @return deletion summary with counts
+    @optimization Uses batch queries to find and delete records efficiently
+    */
+  public async bulkDeleteAttendance(
+    tenantId: string,
+    requestUserId: string,
+    bulkDeleteDto: BulkDeleteAttendanceDTO,
+    res: Response,
+  ) {
+    const apiId = 'api.delete.bulkDeleteAttendance';
+    const results = [];
+    const errors = [];
+    let count = 0;
+
+    try {
+      // Check if attendanceRecords array is provided and not empty
+      if (!bulkDeleteDto.attendanceRecords || bulkDeleteDto.attendanceRecords.length === 0) {
+        this.loggerService.error(
+          'BAD_REQUEST',
+          'At least one record must be provided for deletion',
+          apiId,
+          requestUserId
+        );
+        return APIResponse.error(
+          res,
+          apiId,
+          'BAD_REQUEST',
+          'At least one record must be provided for deletion',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Validate all records first and flatten contextIds array into individual records
+      const validRecords = [];
+      for (let index = 0; index < bulkDeleteDto.attendanceRecords.length; index++) {
+        const record = bulkDeleteDto.attendanceRecords[index];
+        
+        // Ensure either contextId or contextIds is provided
+        if (!record.contextId && (!record.contextIds || record.contextIds.length === 0)) {
+          errors.push({
+            record: {
+              userId: record.userId,
+              contextId: record.contextId || 'missing',
+              date: record.date,
+            },
+            index: index,
+            error: 'Either contextId or contextIds must be provided',
+          });
+          continue;
+        }
+
+        // If both are provided, return error
+        if (record.contextId && record.contextIds && record.contextIds.length > 0) {
+          errors.push({
+            record: {
+              userId: record.userId,
+              contextId: 'ambiguous',
+              date: record.date,
+            },
+            index: index,
+            error: 'Cannot provide both contextId and contextIds. Use one or the other.',
+          });
+          continue;
+        }
+
+        // Handle contextIds array - flatten into individual records
+        const contextIdsToProcess = record.contextIds && record.contextIds.length > 0 
+          ? record.contextIds 
+          : [record.contextId];
+
+        for (const contextId of contextIdsToProcess) {
+          const flattenedRecord = {
+            userId: record.userId,
+            contextId: contextId,
+            date: record.date,
+            index: index,
+          };
+
+          const validationErrors = this.validateDeleteRecord(flattenedRecord, index);
+          
+          if (validationErrors.length > 0) {
+            errors.push({
+              record: {
+                userId: record.userId,
+                contextId: contextId,
+                date: record.date,
+              },
+              index: index,
+              error: validationErrors.join('; '),
+            });
+          } else {
+            validRecords.push(flattenedRecord);
+          }
+        }
+      }
+
+      // If no valid records, return error
+      if (validRecords.length === 0) {
+        this.loggerService.error(
+          'BAD_REQUEST',
+          'No valid records provided for deletion',
+          apiId,
+          requestUserId
+        );
+        return APIResponse.error(
+          res,
+          apiId,
+          'BAD_REQUEST',
+          'No valid records provided for deletion',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // OPTIMIZATION: Batch fetch all attendance records in a single query
+      // Extract unique values to optimize the IN clause
+      const userIds = [...new Set(validRecords.map(r => r.userId))];
+      const contextIds = [...new Set(validRecords.map(r => r.contextId))];
+      const dates = [...new Set(validRecords.map(r => new Date(r.date)))];
+
+      // Find all matching attendance records for this tenant using TypeORM In operator
+      const attendanceRecords = await this.attendanceRepository.find({
+        where: {
+          tenantId: tenantId,
+          userId: In(userIds),
+          contextId: In(contextIds),
+          attendanceDate: In(dates),
+        },
+      });
+
+      // Create a lookup map for faster matching (O(1) instead of O(n))
+      const attendanceMap = new Map();
+      attendanceRecords.forEach(attendance => {
+        // Handle both Date objects and string dates from database
+        let dateStr: string;
+        if (attendance.attendanceDate instanceof Date) {
+          dateStr = attendance.attendanceDate.toISOString().split('T')[0];
+        } else if (typeof attendance.attendanceDate === 'string') {
+          // PostgreSQL DATE type returns string in format YYYY-MM-DD
+          dateStr = attendance.attendanceDate;
+        } else {
+          // Fallback: try to convert to string
+          dateStr = String(attendance.attendanceDate).split('T')[0];
+        }
+        
+        const key = `${attendance.userId}_${attendance.contextId}_${dateStr}`;
+        attendanceMap.set(key, attendance);
+      });
+
+      // Match valid records with found attendance records
+      const recordsToDelete = [];
+      for (const record of validRecords) {
+        const key = `${record.userId}_${record.contextId}_${record.date}`;
+        const attendanceFound = attendanceMap.get(key);
+
+        if (!attendanceFound) {
+          errors.push({
+            record: {
+              userId: record.userId,
+              contextId: record.contextId,
+              date: record.date,
+            },
+            index: record.index,
+            error: 'Attendance record not found',
+          });
+        } else {
+          recordsToDelete.push({
+            attendanceId: attendanceFound.attendanceId,
+            userId: record.userId,
+            contextId: record.contextId,
+            date: record.date,
+            index: record.index,
+          });
+        }
+      }
+
+      // OPTIMIZATION: Batch delete all records in a single query
+      if (recordsToDelete.length > 0) {
+        const attendanceIds = recordsToDelete.map(r => r.attendanceId);
+        
+        try {
+          const deleteResult = await this.attendanceRepository.delete({
+            attendanceId: In(attendanceIds),
+          });
+
+          if (deleteResult.affected > 0) {
+            count = deleteResult.affected;
+            
+            // Publish Kafka events for each deleted record (async, non-blocking)
+            for (const record of recordsToDelete) {
+              results.push({
+                status: 'deleted',
+                attendance: {
+                  userId: record.userId,
+                  contextId: record.contextId,
+                  date: record.date,
+                  attendanceId: record.attendanceId,
+                },
+              });
+              
+              // Publish deletion event to Kafka (fire and forget)
+              this.publishAttendanceEvent('deleted', record.attendanceId, apiId)
+                .catch(error => {
+                  this.loggerService.warn(
+                    `Failed to publish delete event for attendance ${record.attendanceId}: ${error.message}`,
+                    apiId
+                  );
+                });
+            }
+          }
+        } catch (deleteError) {
+          this.loggerService.error(
+            'Error during batch deletion',
+            deleteError.message,
+            apiId,
+            requestUserId
+          );
+          
+          // If batch delete fails, add all records to errors
+          for (const record of recordsToDelete) {
+            errors.push({
+              record: {
+                userId: record.userId,
+                contextId: record.contextId,
+                date: record.date,
+              },
+              index: record.index,
+              error: deleteError.message,
+            });
+          }
+        }
+      }
+
+      // Return response based on results (matching bulkAttendance pattern)
+      if (errors.length > 0) {
+        if (!results.length) {
+          // All records failed
+          this.loggerService.error(
+            'BAD_REQUEST',
+            `Attendance records cannot be deleted. Error: ${errors[0].error}`,
+            apiId,
+            requestUserId
+          );
+          return APIResponse.error(
+            res,
+            apiId,
+            'BAD_REQUEST',
+            `Attendance records cannot be deleted. Error: ${errors[0].error}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        // Partial success
+        this.loggerService.log(
+          `Bulk delete processed with some errors. Deleted: ${count}, Errors: ${errors.length}`,
+          apiId,
+          requestUserId
+        );
+        return APIResponse.success(
+          res,
+          apiId,
+          { totalCount: count, errors: errors, successfulDeletions: results },
+          HttpStatus.OK,
+          'Bulk Attendance Delete processed with some errors',
+        );
+      } else {
+        // All successful
+        this.loggerService.log(
+          `Bulk delete completed successfully. Deleted: ${count}`,
+          apiId,
+          requestUserId
+        );
+        return APIResponse.success(
+          res,
+          apiId,
+          { totalCount: count, deletedAttendance: results },
+          HttpStatus.OK,
+          'Bulk Attendance Deleted successfully',
+        );
+      }
+    } catch (e) {
+      const errorMessage = e.message || 'Internal Server Error';
+      this.loggerService.error(
+        'Internal Server Error',
+        e.message,
+        apiId,
+        requestUserId
+      );
+      return APIResponse.error(
+        res,
+        apiId,
+        'Internal Server Error',
+        errorMessage,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

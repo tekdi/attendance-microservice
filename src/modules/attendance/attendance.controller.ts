@@ -23,17 +23,20 @@ import {
   Res,
   HttpStatus,
   Query,
+  Delete,
 } from '@nestjs/common';
 import { AttendanceDto, BulkAttendanceDTO, Scope } from './dto/attendance.dto';
 import { AttendanceSearchDto } from './dto/attendance-search.dto';
 import { Response } from 'express';
 import { AttendanceService } from './attendance.service';
 import {
+  bulkDeleteAttendanceExamplesForSwagger,
   createAttendanceExamplesForSwagger,
   createBulkAttendanceExamplesForSwagger,
   searchAttendanceExamples,
 } from './dto/attendance.examples';
 import { GetUserId } from 'src/common/decorators/userId.decorator';
+import { BulkDeleteAttendanceDTO } from './dto/bulk-delete-attendance.dto';
 
 @ApiTags('Attendance')
 @Controller('attendance')
@@ -163,4 +166,80 @@ export class AttendanceController {
     );
     return result;
   }
+
+  @Post('bulkAttendanceV2')
+  @ApiCreatedResponse({
+    description: 'Attendance has been created successfully.',
+  })
+  @ApiBadRequestResponse({ description: 'Bad Request' })
+  @ApiOkResponse({ description: 'Attendance updated successfully' })
+  @ApiInternalServerErrorResponse({ description: 'Internal server error' })
+  @ApiBody({
+    type: BulkAttendanceDTO,
+    examples: createBulkAttendanceExamplesForSwagger,
+  })
+  @ApiOperation({
+    summary: 'Create Bulk Attendance V2 with Date Logic',
+    description:
+      'Processes multiple attendance records with date-specific logic: For today, uses standard logic. For past dates, applies cohort-event synchronization rules.',
+  })
+  @ApiHeader({
+    name: 'tenantid',
+  })
+  @UsePipes(new ValidationPipe({ transform: true }))
+  public async bulkAttendanceV2(
+    @Headers() headers,
+    @Res() response: Response,
+    @Body() attendanceDtos: BulkAttendanceDTO,
+    @GetUserId() userId: string,
+  ) {
+    const tenantId = headers['tenantid'];
+    if (!tenantId) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        statusCode: HttpStatus.BAD_REQUEST,
+        errorMessage: 'tenantId is missing in headers',
+      });
+    }
+
+    attendanceDtos.scope = Scope.student; // Set default value to 'Learner'
+    const result = await this.attendanceService.bulkAttendanceV2(
+      tenantId,
+      userId, // Pass userId from query param
+      attendanceDtos,
+      response,
+    );
+    return result;
+  }
+
+  @Delete('bulkDelete')
+  @ApiOkResponse({ description: 'Attendance records deleted successfully' })
+  @ApiBadRequestResponse({ description: 'Bad Request' })
+  @ApiInternalServerErrorResponse({ description: 'Internal Server Error' })
+  @ApiOperation({ summary: "Bulk Delete Attendance Records" })
+  @ApiBody({ type: BulkDeleteAttendanceDTO, examples: bulkDeleteAttendanceExamplesForSwagger })
+  @ApiHeader({
+    name: 'tenantid',
+  })
+  public async bulkDeleteAttendance(
+    @Headers() headers,
+    @Body() bulkDeleteDto: BulkDeleteAttendanceDTO,
+    @Res() response: Response,
+    @GetUserId() userId: string,
+  ) {
+    if (!headers['tenantid']) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        statusCode: HttpStatus.BAD_REQUEST,
+        errorMessage: 'tenantId is missing in headers',
+      });
+    }
+
+    const result = await this.attendanceService.bulkDeleteAttendance(
+      headers['tenantid'],
+      userId,
+      bulkDeleteDto,
+      response,
+    );
+    return result;
+  }
 }
+

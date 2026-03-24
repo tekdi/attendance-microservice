@@ -38,7 +38,32 @@
 			"packageName": "shiksha-attendance"
 		  }
 		]
+	  },
+	  {
+		"sourceRoute": "/interface/v1/account/attendance/bulkDelete",
+		"type": "DELETE",
+		"priority": "MUST_HAVE",
+		"inSequence": false,
+		"orchestrated": false,
+		"targetPackages": [
+		  {
+			"basePackageName": "attendance",
+			"packageName": "shiksha-attendance"
+		  }
+		]
+	  },
+	  {
+		"sourceRoute": "/interface/v1/account/attendance/bulkAttendanceV2",
+		"type": "POST",
+		"priority": "MUST_HAVE",
+		"inSequence": false,
+		"orchestrated": false,
+		"targetPackages": [
+		  {
+			"basePackageName": "attendance",
+			"packageName": "shiksha-attendance"
+		  }
+		]
 	  }
 	]
   }
-  

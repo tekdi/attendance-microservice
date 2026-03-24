@@ -51,7 +51,7 @@ jobs:
       # Step 6: Update Deployment Manifest
       - name: Update Deployment Manifest
         env:
-          IMAGE_TAG: ${{ env.TAG }}
+          IMAGE_TAG: ${{ github.event.inputs.tag }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         run: |
           mkdir -p manifest
@@ -67,6 +67,18 @@ jobs:
           NAMESPACE: ${{ github.event.inputs.environment == 'prod' && 'default' || 'microservices-qa' }}
         run: |
           aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+          echo "========== DEBUG START =========="
+
+          echo "👉 AWS Identity:"
+          aws sts get-caller-identity
+
+          echo "👉 Current kube context:"
+          kubectl config current-context
+
+          echo "👉 Namespaces in this cluster:"
+          kubectl get ns
+
+          echo "========== DEBUG END =========="
           kubectl apply -f manifest/configmap.yaml -n $NAMESPACE
           kubectl apply -f manifest/attendance-service-updated.yaml -n $NAMESPACE
           # Force pods to reload config after update

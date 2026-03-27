@@ -34,7 +34,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # 4. Write ConfigMap (NO PRINT → prevents secret leak)
+      # 4. Write ConfigMap
       - name: Write ConfigMap manifest
         run: |
           mkdir -p manifest

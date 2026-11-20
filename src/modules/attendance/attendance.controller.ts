@@ -181,7 +181,7 @@ export class AttendanceController {
   @ApiOperation({
     summary: 'Create Bulk Attendance V2 with Date Logic',
     description:
-      'Processes multiple attendance records with date-specific logic: For today, uses standard logic. For past dates, applies cohort-event synchronization rules.',
+      'Processes multiple attendance records for any date. For event context (cohortId required), the cohort attendance is synced: present if any event that day is present, otherwise absent.',
   })
   @ApiHeader({
     name: 'tenantid',

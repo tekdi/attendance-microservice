@@ -860,9 +860,10 @@ export class AttendanceService {
     }
   }
 
-  /*Method to add multiple attendance records with date-specific logic
-    - For today's date: uses standard bulkAttendance logic
-    - For past dates: applies cohort-event synchronization rules
+  /*Method to add multiple attendance records and sync cohort attendance, for any date
+    - Event context: saves event rows, then sets the cohort row to present if any event that day is present, else absent
+    - Cohort context: just saves the rows
+    - cohortId is required for event context
     @body Array of objects containing attendance details of user (BulkAttendanceDTO)
     @publishes Kafka events for each created/updated attendance record
     */
@@ -876,38 +877,26 @@ export class AttendanceService {
     const apiId = 'api.post.bulkAttendanceV2';
 
     try {
-      // Parse the attendance date from the payload
-      const attendanceDate = new Date(attendanceData.attendanceDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      attendanceDate.setHours(0, 0, 0, 0);
-
-      // Check if the date is today
-      const isToday = attendanceDate.getTime() === today.getTime();
-
-      if (isToday) {
-        // If date is today, use the standard bulkAttendance logic
-        this.loggerService.log(
-          'Date is today, using standard bulkAttendance logic',
-          apiId,
-          userId
-        );
-        return await this.multipleAttendance(tenantId, userId, attendanceData, res);
-      } else {
-        // For past dates, apply date-specific logic
-        this.loggerService.log(
-          'Date is in the past, applying cohort-event synchronization logic',
-          apiId,
-          userId
-        );
-        return await this.bulkAttendanceWithCohortEventSync(
-          tenantId,
-          loginUserId,
-          attendanceData,
+      // Event attendance syncs the cohort row, which cannot be created without a cohortId
+      if (attendanceData.context?.toLowerCase() === 'event' && !attendanceData.cohortId) {
+        return APIResponse.error(
           res,
-          apiId
+          apiId,
+          'BAD_REQUEST',
+          'cohortId is required when context is event',
+          HttpStatus.BAD_REQUEST,
         );
       }
+
+      // Same flow for every date: save the rows, then sync the cohort row from event rows
+      return await this.bulkAttendanceWithCohortEventSync(
+        tenantId,
+        loginUserId,
+        attendanceData,
+        res,
+        apiId,
+        attendanceData.cohortId
+      );
     } catch (e) {
       const errorMessage = e.message || 'Internal Server Error';
       this.loggerService.error(
@@ -926,7 +915,7 @@ export class AttendanceService {
     }
   }
 
-  /*Helper method for handling past date attendance with cohort-event synchronization
+  /*Helper method for handling attendance (any date) with cohort-event synchronization
     - Cohort context: simply updates attendance
     - Event context: updates event attendance, then syncs cohort attendance based on event statuses
     - OPTIMIZED: Single batch query for cohort sync instead of N queries
@@ -936,7 +925,8 @@ export class AttendanceService {
     loginUserId: string | null,
     attendanceData: BulkAttendanceDTO,
     res: Response,
-    apiId: string
+    apiId: string,
+    cohortId?: string
   ) {
     const results = [];
     const errors = [];
@@ -1002,7 +992,8 @@ export class AttendanceService {
             Array.from(userIdsForSync),
             attendanceData.attendanceDate,
             loginUserId,
-            apiId
+            apiId,
+            cohortId
           );
         } catch (syncError) {
           this.loggerService.error(
@@ -1092,7 +1083,8 @@ export class AttendanceService {
     userIds: string[],
     attendanceDate: string,
     loginUserId: string | null,
-    apiId: string
+    apiId: string,
+    cohortId?: string
   ) {
     if (!userIds || userIds.length === 0) {
       return;
@@ -1100,7 +1092,6 @@ export class AttendanceService {
 
     const date = new Date(attendanceDate);
     
-    // OPTIMIZATION: Single query to fetch all attendance records for all users
     const allAttendanceRecords = await this.attendanceRepository.find({
       where: {
         tenantId: tenantId,
@@ -1109,17 +1100,13 @@ export class AttendanceService {
       },
     });
 
-    if (!allAttendanceRecords || allAttendanceRecords.length === 0) {
-      this.loggerService.log(
-        `No attendance records found for ${userIds.length} users on ${attendanceDate}`,
-        apiId,
-        loginUserId
-      );
-      return;
-    }
-
     // Group records by userId for efficient processing
     const recordsByUser = new Map<string, { events: any[], cohorts: any[] }>();
+
+    // Initialize all userIds so users with no records are still processed
+    for (const uid of userIds) {
+      recordsByUser.set(uid, { events: [], cohorts: [] });
+    }
     
     for (const record of allAttendanceRecords) {
       if (!recordsByUser.has(record.userId)) {
@@ -1131,37 +1118,53 @@ export class AttendanceService {
       
       if (context === 'event') {
         userRecords.events.push(record);
-      } else if (context === 'cohort') {
+      } else if (context === 'cohort' && (!cohortId || record.contextId === cohortId)) {
+        // only this cohort's row counts; another cohort's row must not block creation or be overwritten
         userRecords.cohorts.push(record);
       }
     }
 
-    // Batch process: Collect all cohort records that need updating
     const cohortRecordsToUpdate = [];
+    const cohortRecordsToCreate = [];
 
     for (const [userId, records] of recordsByUser) {
       if (records.events.length === 0) {
-        continue; // No events to sync from
+        continue;
       }
 
-      // Determine if any event has present attendance
       const hasAnyPresent = records.events.some(
         record => record.attendance?.toLowerCase() === 'present'
       );
 
       const cohortAttendanceStatus = hasAnyPresent ? 'present' : 'absent';
 
-      // Check each cohort record for this user
-      for (const cohortRecord of records.cohorts) {
-        if (cohortRecord.attendance !== cohortAttendanceStatus) {
-          cohortRecord.attendance = cohortAttendanceStatus;
-          cohortRecord.updatedBy = loginUserId;
-          cohortRecordsToUpdate.push(cohortRecord);
+      if (records.cohorts.length > 0) {
+        // Update existing cohort records
+        for (const cohortRecord of records.cohorts) {
+          if (cohortRecord.attendance !== cohortAttendanceStatus) {
+            cohortRecord.attendance = cohortAttendanceStatus;
+            cohortRecord.updatedBy = loginUserId;
+            cohortRecordsToUpdate.push(cohortRecord);
+          }
         }
+      } else if (cohortId) {
+        // No cohort record exists — create one using the provided cohortId
+        const newCohortAttendance = new AttendanceDto({
+          attendanceDate: attendanceDate,
+          contextId: cohortId,
+          context: 'cohort',
+          scope: Scope.student,
+          attendance: cohortAttendanceStatus,
+          userId: userId,
+          tenantId: tenantId,
+          createdBy: loginUserId,
+          updatedBy: loginUserId,
+        });
+        cohortRecordsToCreate.push(newCohortAttendance);
       }
     }
 
-    // OPTIMIZATION: Batch save all updates in one transaction
+    // Batch update existing cohort records
     if (cohortRecordsToUpdate.length > 0) {
       this.loggerService.log(
         `Batch updating ${cohortRecordsToUpdate.length} cohort attendance records`,
@@ -1171,7 +1174,6 @@ export class AttendanceService {
 
       const updatedRecords = await this.attendanceRepository.save(cohortRecordsToUpdate);
       
-      // Publish Kafka events for all updates (fire and forget)
       for (const updatedRecord of updatedRecords) {
         this.publishAttendanceEvent('updated', updatedRecord.attendanceId, apiId)
           .catch(error => {
@@ -1183,13 +1185,44 @@ export class AttendanceService {
       }
 
       this.loggerService.log(
-        `Successfully synced cohort attendance for ${recordsByUser.size} users`,
+        `Successfully synced ${updatedRecords.length} existing cohort attendance records`,
         apiId,
         loginUserId
       );
-    } else {
+    }
+
+    // Batch create missing cohort records
+    if (cohortRecordsToCreate.length > 0) {
       this.loggerService.log(
-        `No cohort attendance updates needed for ${recordsByUser.size} users`,
+        `Creating ${cohortRecordsToCreate.length} missing cohort attendance records`,
+        apiId,
+        loginUserId
+      );
+
+      const createdRecords = await this.attendanceRepository.save(
+        this.attendanceRepository.create(cohortRecordsToCreate),
+      );
+
+      for (const createdRecord of createdRecords) {
+        this.publishAttendanceEvent('created', createdRecord.attendanceId, apiId)
+          .catch(error => {
+            this.loggerService.warn(
+              `Failed to publish event for attendance ${createdRecord.attendanceId}: ${error.message}`,
+              apiId
+            );
+          });
+      }
+
+      this.loggerService.log(
+        `Successfully created ${createdRecords.length} cohort attendance records`,
+        apiId,
+        loginUserId
+      );
+    }
+
+    if (cohortRecordsToUpdate.length === 0 && cohortRecordsToCreate.length === 0) {
+      this.loggerService.log(
+        `No cohort attendance changes needed for ${recordsByUser.size} users`,
         apiId,
         loginUserId
       );

@@ -235,6 +235,15 @@ export class BulkAttendanceDTO {
   @IsEnum(Scope, { message: "Please enter valid enum values for scope [self, Learner]" })
   scope: string
 
+  @ApiPropertyOptional({
+    type: String,
+    description: 'The cohortId for cohort-event sync (required for bulkAttendanceV2 with event context on past dates)',
+  })
+  @IsOptional()
+  @IsUUID()
+  @Expose()
+  cohortId: string;
+
   @ApiProperty({
     type: [UserAttendanceDTO], // Specify the type of userAttendance as an array of UserAttendanceDTO
     description: 'List of user attendance details',

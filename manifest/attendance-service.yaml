@@ -22,7 +22,7 @@ spec:
         imagePullPolicy: "Always"
         name: attendance-service
         envFrom:
-        - configMapRef:
+        - secretRef:
             name: attendance-service-config
         ports:
         - containerPort: 3000

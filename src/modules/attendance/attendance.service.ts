@@ -860,9 +860,10 @@ export class AttendanceService {
     }
   }
 
-  /*Method to add multiple attendance records with date-specific logic
-    - For today's date: uses standard bulkAttendance logic
-    - For past dates: applies cohort-event synchronization rules
+  /*Method to add multiple attendance records and sync cohort attendance, for any date
+    - Event context: saves event rows, then sets the cohort row to present if any event that day is present, else absent
+    - Cohort context: just saves the rows
+    - cohortId is required for event context
     @body Array of objects containing attendance details of user (BulkAttendanceDTO)
     @publishes Kafka events for each created/updated attendance record
     */
@@ -876,39 +877,26 @@ export class AttendanceService {
     const apiId = 'api.post.bulkAttendanceV2';
 
     try {
-      // Parse the attendance date from the payload
-      const attendanceDate = new Date(attendanceData.attendanceDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      attendanceDate.setHours(0, 0, 0, 0);
-
-      // Check if the date is today
-      const isToday = attendanceDate.getTime() === today.getTime();
-
-      if (isToday) {
-        // If date is today, use the standard bulkAttendance logic
-        this.loggerService.log(
-          'Date is today, using standard bulkAttendance logic',
-          apiId,
-          userId
-        );
-        return await this.multipleAttendance(tenantId, userId, attendanceData, res);
-      } else {
-        // For past dates, apply date-specific logic
-        this.loggerService.log(
-          'Date is in the past, applying cohort-event synchronization logic',
-          apiId,
-          userId
-        );
-        return await this.bulkAttendanceWithCohortEventSync(
-          tenantId,
-          loginUserId,
-          attendanceData,
+      // Event attendance syncs the cohort row, which cannot be created without a cohortId
+      if (attendanceData.context?.toLowerCase() === 'event' && !attendanceData.cohortId) {
+        return APIResponse.error(
           res,
           apiId,
-          attendanceData.cohortId
+          'BAD_REQUEST',
+          'cohortId is required when context is event',
+          HttpStatus.BAD_REQUEST,
         );
       }
+
+      // Same flow for every date: save the rows, then sync the cohort row from event rows
+      return await this.bulkAttendanceWithCohortEventSync(
+        tenantId,
+        loginUserId,
+        attendanceData,
+        res,
+        apiId,
+        attendanceData.cohortId
+      );
     } catch (e) {
       const errorMessage = e.message || 'Internal Server Error';
       this.loggerService.error(
@@ -927,7 +915,7 @@ export class AttendanceService {
     }
   }
 
-  /*Helper method for handling past date attendance with cohort-event synchronization
+  /*Helper method for handling attendance (any date) with cohort-event synchronization
     - Cohort context: simply updates attendance
     - Event context: updates event attendance, then syncs cohort attendance based on event statuses
     - OPTIMIZED: Single batch query for cohort sync instead of N queries
